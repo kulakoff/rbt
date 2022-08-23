@@ -19,7 +19,10 @@
  * 410 авторизация отозвана
  * 424 неверный токен
  */
-
+    //Проверка POST BODY
+    if (!$postdata['domophoneId']) response(422);
+    //TODO if или тернарный оператор!?
+    //$postdata['domophoneId']?:response(422);
     auth(15);
 
     $domophone_id = (int)@$postdata['domophoneId'];
