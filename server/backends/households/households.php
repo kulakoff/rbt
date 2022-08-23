@@ -229,6 +229,13 @@
             abstract public function getDomophone($domophoneId);
 
             /**
+             * @param  integer $subscriberId
+             * @param integer $domophoneId
+             * @return boolean
+             */
+            abstract public function isOpeningAllowed($subscriberId, $domophoneId);
+
+            /**
              * @param $by - "id", "mobile", "flat", "...?"
              * @param $query
              * @return false|array
