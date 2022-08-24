@@ -1018,7 +1018,7 @@
                 (SELECT house_domophone_id   FROM houses_entrances WHERE house_entrance_id  IN (
                 SELECT house_entrance_id  FROM houses_entrances_flats WHERE house_flat_id IN 
                 (SELECT house_flat_id  FROM houses_flats  
-                WHERE NOT (manual_block OR auto_block ) AND house_flat_id  IN 
+                WHERE NOT (COALESCE (manual_block,0) OR COALESCE (auto_block, 0)) AND house_flat_id IN 
                 (SELECT house_flat_id  FROM houses_flats_subscribers WHERE house_subscriber_id = $subscriberId)))) as t WHERE house_domophone_id = $domophoneId");
                 
                 $dAllowed[0]["foundDomophoneId"] == 1 ?  $dAllowed = true :  $dAllowed = false;
