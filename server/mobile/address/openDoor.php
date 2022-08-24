@@ -19,15 +19,42 @@
  * 410 авторизация отозвана
  * 424 неверный токен
  */
+    //Проверка POST BODY
+    if (!$postdata['domophoneId']) response(422);
 
     auth(15);
-
+    
     $domophone_id = (int)@$postdata['domophoneId'];
     $door_id = (int)@$postdata['doorId'];
-    
-    // TODO: добавить проверку на блокировку домофона
-    
     $households = loadBackend("households");
+    
+    // добавить проверку на блокировку домофона
+    // Проверка блокировки квартиры
+    $userFlats = [];
+    foreach($subscriber['flats'] as $flat) { 
+    $flatDetail = $households->getFlat($flat['flatId']);
+
+    $flatItem = [];
+    $flatItem['flatId'] = $flatDetail['flatId'];
+    $flatItem['isBlocked'] = $flatDetail['autoBlock'] || $flatDetail['manualBlock'] ?: false;
+    $flatItem['domophones'] = [];
+
+    foreach($flatDetail['entrances'] as $entrace) {
+        $flatItem['domophones'][] = $entrace['domophoneId']; 
+    }
+    //Получаем только квартиры без блокировки
+    !$flatItem['isBlocked'] ?: $userFlats[] = $flatItem; 
+    }
+
+    foreach($userFlats as $dmophoneItem) {
+    if ( in_array($domophone_id,$dmophoneItem['domophones'])){
+        response(404, false, false, 'Услуга недоступна (договор заблокирован либо не оплачен)');
+        break;
+    }
+    }
+    // TODO: удалить зуглушку тестового ответа
+    response(200,"Тест, дверь открыта");
+    
     $domophone = $households->getDomophone($domophone_id);
 
     $model = loadDomophone($domophone["model"], $domophone["url"], $domophone["credentials"]);
