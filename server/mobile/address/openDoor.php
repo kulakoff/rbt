@@ -28,8 +28,8 @@
     $door_id = (int)@$postdata['doorId'];
     $households = loadBackend("households");
     
-    // добавить проверку на блокировку домофона
-    // Проверка блокировки квартиры
+    //TODO: добавить проверку на блокировку домофона
+    // Проверка блокировки квартиры, получаем список доступных domophoneId
     $userFlats = [];
     foreach($subscriber['flats'] as $flat) { 
     $flatDetail = $households->getFlat($flat['flatId']);
@@ -42,16 +42,19 @@
     foreach($flatDetail['entrances'] as $entrace) {
         $flatItem['domophones'][] = $entrace['domophoneId']; 
     }
-    //Получаем только квартиры без блокировки
-    !$flatItem['isBlocked'] ?: $userFlats[] = $flatItem; 
+    $flatItem['isBlocked'] ?: $userFlats[] = $flatItem; 
     }
 
+    $userDomophones=[];
     foreach($userFlats as $dmophoneItem) {
-    if ( in_array($domophone_id,$dmophoneItem['domophones'])){
+        $userDomophones= [...$userDomophones,...$dmophoneItem['domophones']];
+    }
+    // Доступне пользователю для управления domophoneIds
+    $userDomophones = array_values(array_unique($userDomophones));
+    //Возвращаем ответ пользователю если не найден запрошеный domophone_id
+    if (!in_array($domophone_id, $userDomophones)) {
         response(404, false, false, 'Услуга недоступна (договор заблокирован либо не оплачен)');
-        break;
-    }
-    }
+    } 
     // TODO: удалить зуглушку тестового ответа
     response(200,"Тест, дверь открыта");
     
