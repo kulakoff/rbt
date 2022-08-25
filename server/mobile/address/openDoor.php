@@ -19,15 +19,26 @@
  * 410 авторизация отозвана
  * 424 неверный токен
  */
-
+    //Проверка POST BODY
+    if (!$postdata['domophoneId']) response(422);
+    //TODO if или тернарный оператор!?
+    //$postdata['domophoneId']?:response(422);
     auth(15);
 
     $domophone_id = (int)@$postdata['domophoneId'];
     $door_id = (int)@$postdata['doorId'];
     
-    // TODO: добавить проверку на блокировку домофона
-    
     $households = loadBackend("households");
+
+    // TODO: добавить проверку на блокировку домофона
+    //Проверка блокировки квартиры
+    $isBlocked = @$households->isOpeningAllowed((int)@$subscriber['subscriberId'], $domophone_id);
+    $isBlocked ?: response(404, false, false, 'Услуга недоступна (договор заблокирован либо не оплачен)');
+
+    // TODO: удалить зуглушку тестового ответа
+    response(200, false, false, "Тест, дверь открыта");
+
+
     $domophone = $households->getDomophone($domophone_id);
 
     $model = loadDomophone($domophone["model"], $domophone["url"], $domophone["credentials"]);
