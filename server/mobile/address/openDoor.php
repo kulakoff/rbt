@@ -49,7 +49,7 @@
     foreach($userFlats as $dmophoneItem) {
         $userDomophones= [...$userDomophones,...$dmophoneItem['domophones']];
     }
-    // Доступне пользователю для управления domophoneIds
+    // Доступные пользователю domophoneIds для управления 
     $userDomophones = array_values(array_unique($userDomophones));
     //Возвращаем ответ пользователю если не найден запрошеный domophone_id
     if (!in_array($domophone_id, $userDomophones)) {
