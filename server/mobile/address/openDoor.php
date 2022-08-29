@@ -46,7 +46,7 @@
         ] = $GLOBALS["households"]->getFlat($flat['flatId']);
 
         $availableDomophones = [];
-        foreach ($entrances as $key=>$entrace) {
+        foreach ($entrances as $entrace) {
             $availableDomophones[] = $entrace['domophoneId'];
         }
         $availableDomophones = array_values($availableDomophones);
@@ -58,7 +58,7 @@
     $isOpenAllowed ?: response(404, 'Услуга недоступна (договор заблокирован либо не оплачен)');
 
     // TODO: удалить заглушку тестового ответа
-    // response(200, "Тест, дверь открыта");
+    response(200, "Тест, дверь открыта");
 
     $domophone = $households->getDomophone($domophone_id);
     $model = loadDomophone($domophone["model"], $domophone["url"], $domophone["credentials"]);
