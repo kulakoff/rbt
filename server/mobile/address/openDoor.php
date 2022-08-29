@@ -51,7 +51,7 @@
         }
         $availableDomophones = array_values($availableDomophones);
 
-        return $sum +  (!($autoBlock || $manualBlock) && in_array($GLOBALS["domophone_id"], $availableDomophones));
+        return $sum + (!($autoBlock || $manualBlock) && in_array($GLOBALS["domophone_id"], $availableDomophones));
     };
 
     $isOpenAllowed = @(bool)array_reduce($subscriber['flats'], 'checkFlat');
