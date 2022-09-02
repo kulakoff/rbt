@@ -53,11 +53,10 @@ foreach ($subscriber['flats'] as $flat) {
 }
 
 if (!$blocked) {
-    response(200,"open");
     $domophone = $households->getDomophone($domophone_id);
     $model = loadDomophone($domophone["model"], $domophone["url"], $domophone["credentials"]);
     $model->open_door($door_id);
-    // response();
+    response();
 } else {
     response(404, false, 'Не найдено', 'Услуга недоступна (договор заблокирован либо не оплачен)');
 }
