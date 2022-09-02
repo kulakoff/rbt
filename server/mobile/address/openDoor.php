@@ -21,7 +21,7 @@
  */
 
 // Проверка POST BODY
-if (!$postdata['domophoneId'] || !in_array(intval($postdata['doorId']), range(0,2))) {
+if (!$postdata['domophoneId'] || !in_array(intval($postdata['doorId']), range(0, 2))) {
     response(422);
 };
 
@@ -35,7 +35,7 @@ $households = loadBackend("households");
 $blocked = true;
 foreach ($subscriber['flats'] as $flat) {
     $flatDetail = $households->getFlat($flat['flatId']);
-    if ($flatDetail['autoBlock'] || $flatDetail['manualBlock']) {
+    if ($flatDetail['autoBlock']) {
         continue;
     }
 
