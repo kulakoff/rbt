@@ -212,9 +212,21 @@ function auth($_response_cache_ttl = -1) {
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $raw_postdata = file_get_contents("php://input");
     $postdata = json_decode($raw_postdata, true);
-    $m = explode('/', $_SERVER["REQUEST_URI"]);
 
-    if (count($m) == 4 && !$m[0] && $m[1] == 'mobile') {
+    //URL path
+    // /server/mobile.php/MODULE/METHOD
+    $path = explode("?", $_SERVER["REQUEST_URI"])[0];
+    if ($path && $path[0] == '/') {
+        $path = substr($path, 1);
+    }
+    $m = explode('/', $path);
+
+    //Обрезаем .php в конце!
+    if ($m[1] === "mobile.php") {
+        $m[1] = trim($m[1], ".php");
+    }
+
+    if (count($m) == 4 && $m[1] == 'mobile') {
         $module = $m[2];
         $method = $m[3];
         if (file_exists(__DIR__ . "/mobile/{$module}/{$method}.php")) {
