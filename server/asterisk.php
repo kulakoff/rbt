@@ -7,15 +7,25 @@
     require_once "utils/loader.php";
     require_once "utils/checkint.php";
     require_once "utils/db_ext.php";
+    require_once "utils/debug.php";
+    require_once "utils/i18n.php";
+
     require_once "backends/backend.php";
 
     header('Content-Type: application/json');
 
     try {
-        $config = @json_decode(file_get_contents("config/config.json"), true);
+        $config = @json_decode(file_get_contents(__DIR__ . "/config/config.json"), true);
     } catch (Exception $e) {
-        echo "can't load config file\n";
-        exit(1);
+        $config = false;
+    }
+
+    if (!$config) {
+        try {
+            $config = @json_decode(json_encode(yaml_parse_file(__DIR__ . "/config/config.yml")), true);
+        } catch (Exception $e) {
+            $config = false;
+        }
     }
 
     if (!$config) {
@@ -32,6 +42,7 @@
         $db = new PDO_EXT(@$config["db"]["dsn"], @$config["db"]["username"], @$config["db"]["password"], @$config["db"]["options"]);
     } catch (Exception $e) {
         echo "can't open database " . $config["db"]["dsn"] . "\n";
+        echo $e->getMessage() . "\n";
         exit(1);
     }
 
@@ -96,7 +107,7 @@
                             "auth" => $extension,
                             "outbound_auth" => $extension,
                             "aors" => $extension,
-                            "callerid" => $panel["callerId"],
+                            "callerid" => $extension,
                             "context" => "default",
                             "disallow" => "all",
                             "allow" => "alaw,h264",
@@ -164,7 +175,7 @@
                             "direct_media" => "no",
                             "allow_subscribe" => "yes",
                             "dtmf_mode" => "rfc4733",
-                            "ice_support" => "no",
+                            "ice_support" => "yes",
                         ];
                     }
 
@@ -174,7 +185,59 @@
 
         // sip extension
         if ($extension[0] === "4" && strlen($extension) === 10) {
+            $households = loadBackend('households');
 
+            $flatId = (int)substr($extension, 1);
+            $cred = $households->getFlat($flatId)['sipPassword'];
+
+            switch ($section) {
+                case "aors":
+                    if ($cred) {
+                        return [
+                            "id" => $extension,
+                            "max_contacts" => "1",
+                            "remove_existing" => "yes"
+                        ];
+                    }
+
+                    break;
+
+                case "auths":
+                    if ($cred) {
+                        return [
+                            "id" => $extension,
+                            "username" => $extension,
+                            "auth_type" => "userpass",
+                            "password" => $cred,
+                        ];
+                    }
+
+                    break;
+
+                case "endpoints":
+                    if ($cred) {
+                        return [
+                            "id" => $extension,
+                            "auth" => $extension,
+                            "outbound_auth" => $extension,
+                            "aors" => $extension,
+                            "callerid" => $extension,
+                            "context" => "default",
+                            "disallow" => "all",
+                            "allow" => "alaw,h264",
+                            "rtp_symmetric" => "yes",
+                            "force_rport" => "yes",
+                            "rewrite_contact" => "yes",
+                            "timers" => "no",
+                            "direct_media" => "no",
+                            "allow_subscribe" => "yes",
+                            "dtmf_mode" => "rfc4733",
+                            "ice_support" => "no",
+                        ];
+                    }
+
+                    break;
+            }
         }
 
         // webrtc extension
@@ -223,14 +286,7 @@
                             "context" => "default",
                             "disallow" => "all",
                             "allow" => "alaw,h264",
-//                            "rtp_symmetric" => "no",
-//                            "force_rport" => "no",
-//                            "rewrite_contact" => "yes",
-//                            "timers" => "no",
-//                            "direct_media" => "no",
-//                            "allow_subscribe" => "yes",
                             "dtmf_mode" => "rfc4733",
-//                            "ice_support" => "no",
                             "webrtc" => "yes",
                         ];
                     }
@@ -239,12 +295,6 @@
             }
         }
     }
-
-/*
-        mysql_query("insert into ps_aors (id, max_contacts, remove_existing, synchronized, expire) values ('"..extension.."', 1, 'yes', true, addtime(now(), '00:03:00'))")
-        mysql_query("insert ignore into ps_auths (id, auth_type, password, username, synchronized) values ('"..extension.."', 'userpass', '"..hash.."', '"..extension.."', true)")
-        mysql_query("insert ignore into ps_endpoints (id, auth, outbound_auth, aors, context, disallow, allow, dtmf_mode, rtp_symmetric, force_rport, rewrite_contact, direct_media, transport, ice_support, synchronized) values ('"..extension.."', '"..extension.."', '"..extension.."', '"..extension.."', 'default', 'all', 'alaw,h264', 'rfc4733', 'yes', 'yes', 'yes', 'no', 'transport-tcp', 'yes', true)")
-*/
 
     $path = $_SERVER["REQUEST_URI"];
 
@@ -272,7 +322,13 @@
 
             switch ($path[1]) {
                 case "log":
-                    error_log($params);
+                    logMsg($params);
+
+                    break;
+
+                case "debug":
+                    debugMsg($params);
+
                     break;
 
                 case "autoopen":
@@ -285,37 +341,56 @@
 
                     $rabbit = (int)$flat["whiteRabbit"];
 
-                    echo json_encode(strtotime($flat["autoOpen"]) > time() || ($rabbit && strtotime($flat["lastOpened"]) + $rabbit * 60 > time()));
+                    echo json_encode($flat["autoOpen"] > time() || ($rabbit && $flat["lastOpened"] + $rabbit * 60 > time()));
+
                     break;
 
                 case "flat":
                     $households = loadBackend("households");
 
                     echo json_encode($households->getFlat((int)$params));
+
                     break;
 
                 case "flatIdByPrefix":
                     $households = loadBackend("households");
 
-                    echo json_encode($households->getFlats("domophoneAndNumber", $params));
+                    echo json_encode($households->getFlats("flatIdByPrefix", $params));
+
+                    break;
+
+                case "apartment":
+                    $households = loadBackend("households");
+
+                    echo json_encode($households->getFlats("apartment", $params));
+
                     break;
 
                 case "subscribers":
                     $households = loadBackend("households");
 
-                    echo json_encode($households->getSubscribers("flat", (int)$params));
+                    echo json_encode($households->getSubscribers("flatId", (int)$params));
+
                     break;
 
                 case "domophone":
                     $households = loadBackend("households");
 
                     echo json_encode($households->getDomophone((int)$params));
+
                     break;
 
                 case "entrance":
                     $households = loadBackend("households");
 
-                    echo json_encode($households->getEntrances("domophoneId", [ "domophoneId" => (int)$params, "output" => "0" ]));
+                    $entrances = $households->getEntrances("domophoneId", [ "domophoneId" => (int)$params, "output" => "0" ]);
+
+                    if ($entrances) {
+                        echo json_encode($entrances[0]);
+                    } else {
+                        echo json_encode(false);
+                    }
+
                     break;
 
                 case "camshot":
@@ -325,16 +400,16 @@
                         $entrances = $households->getEntrances("domophoneId", [ "domophoneId" => $params["domophoneId"], "output" => "0" ]);
 
                         if ($entrances && $entrances[0]) {
-                            $camera = $households->getCamera($entrances[0]["cameraId"]);
+                            $cameras = $households->getCameras("id", $entrances[0]["cameraId"]);
 
-                            if ($camera) {
-                                $model = loadCamera($camera["model"], $camera["url"], $camera["credentials"]);
+                            if ($cameras && $cameras[0]) {
+                                $model = loadCamera($cameras[0]["model"], $cameras[0]["url"], $cameras[0]["credentials"]);
 
                                 $redis->setex("shot_" . $params["hash"], 3 * 60, $model->camshot());
                                 $redis->setex("live_" . $params["hash"], 3 * 60, json_encode([
-                                    "model" => $camera["model"],
-                                    "url" => $camera["url"],
-                                    "credentials" => $camera["credentials"],
+                                    "model" => $cameras[0]["model"],
+                                    "url" => $cameras[0]["url"],
+                                    "credentials" => $cameras[0]["credentials"],
                                 ]));
 
                                 echo $params["hash"];
@@ -353,17 +428,28 @@
 
                     break;
 
+                case "server":
+                    $sip = loadBackend("sip");
+
+                    if ($sip) {
+
+                    }
+
+                    break;
+
                 case "push":
                     $isdn = loadBackend("isdn");
+                    $sip = loadBackend("sip");
+                    $server = $sip->server("extension", $params["extension"]);
 
-                    $isdn->push([
+                    $params = [
                         "token" => $params["token"],
                         "type" => $params["tokenType"],
                         "hash" => $params["hash"],
                         "extension" => $params["extension"],
-                        "server" => $config["asterisk_servers"][0]["ip"],
-                        "port" => $config["asterisk_servers"][0]["sip_tcp_port"],
-                        "transport" => 'tcp',
+                        "server" => $server["ip"],
+                        "port" => @$server["sip_tcp_port"] ? : 5060,
+                        "transport" => "tcp",
                         "dtmf" => $params["dtmf"],
                         "timestamp" => time(),
                         "ttl" => 30,
@@ -371,10 +457,16 @@
                         "callerId" => $params["callerId"],
                         "flatId" => $params["flatId"],
                         "flatNumber" => $params["flatNumber"],
-                        "stun" => $config["asterisk_servers"][0]["stun_server"],
-                        "stunTransport" => "udp",
-                        "title" => $config["asterisk_servers"][0]["incoming_title"],
-                    ]);
+                        "title" => i18n("sip.incomingTitle"),
+                    ];
+
+                    $stun = $sip->stun($params["extension"]);
+                    if ($stun) {
+                        $params["stun"] = $stun;
+                        $params["stunTransport"] = "udp";
+                    }
+
+                    $isdn->push($params);
 
                     break;
             }

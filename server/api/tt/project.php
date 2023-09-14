@@ -15,9 +15,17 @@
         class project extends api {
 
             public static function POST($params) {
-                $projectId = loadBackend("tt")->addProject($params["acronym"], $params["project"]);
+                $tt = loadBackend("tt");
 
-                return api::ANSWER($projectId, ($projectId !== false)?"projectId":"notAcceptable");
+                if (array_key_exists("filter", $params)) {
+                    $success = $tt->addProjectFilter($params["_id"], $params["filter"], $params["personal"]);
+
+                    return api::ANSWER($success);
+                } else {
+                    $projectId = $tt->addProject($params["acronym"], $params["project"]);
+
+                    return api::ANSWER($projectId, ($projectId !== false)?"projectId":"notAcceptable");
+                }
             }
 
             public static function PUT($params) {
@@ -25,7 +33,7 @@
                 $tt = loadBackend("tt");
 
                 if (array_key_exists("acronym", $params)) {
-                    $success = $tt->modifyProject($params["_id"], $params["acronym"]);
+                    $success = $tt->modifyProject($params["_id"], $params["acronym"], $params["project"], $params["maxFileSize"], $params["searchSubject"], $params["searchDescription"], $params["searchComments"], $params["assigned"]);
                 }
 
                 if (array_key_exists("workflows", $params)) {
@@ -40,11 +48,21 @@
                     $success = $tt->setProjectCustomFields($params["_id"], $params["customFields"]);
                 }
 
-                return api::ANSWER($success, ($success !== false)?false:"notAcceptable");
+                if (array_key_exists("viewers", $params)) {
+                    $success = $tt->setProjectViewers($params["_id"], $params["viewers"]);
+                }
+
+                return api::ANSWER($success);
             }
 
             public static function DELETE($params) {
-                $success = loadBackend("tt")->deleteProject($params["_id"]);
+                $tt = loadBackend("tt");
+
+                if (array_key_exists("filter", $params)) {
+                    $success = $tt->deleteProjectFilter($params["filter"]);
+                } else {
+                    $success = $tt->deleteProject($params["_id"]);
+                }
 
                 return api::ANSWER($success, ($success !== false)?false:"notAcceptable");
             }
@@ -52,10 +70,9 @@
             public static function index() {
                 if (loadBackend("tt")) {
                     return [
-                        "GET" => "tt",
-                        "POST" => "tt",
-                        "PUT" => "tt",
-                        "DELETE" => "tt",
+                        "POST",
+                        "PUT",
+                        "DELETE",
                     ];
                 } else {
                     return false;

@@ -21,13 +21,18 @@
                     $meta = [
                         "projects" => $tt->getProjects(),
                         "workflows" => $tt->getWorkflows(),
-                        "workflowAliases" => $tt->getWorkflowAliases(),
-                        "filters" => $tt->availableFilters(),
+                        "workflowLibs" => $tt->getWorkflowLibs(),
+                        "filters" => $tt->getFilters(),
+                        "filtersExt" => $tt->getFiltersExt(),
                         "statuses" => $tt->getStatuses(),
                         "resolutions" => $tt->getResolutions(),
                         "customFields" => $tt->getCustomFields(),
                         "roles" => $tt->getRoles(),
                         "tags" => $tt->getTags(),
+                        "viewers" => $tt->getViewers(),
+                        "crontabs" => $tt->getCrontabs(),
+                        "myRoles" => $tt->myRoles(),
+                        "myGroups" => $tt->myGroups(),
                     ];
 
                     return api::ANSWER($meta, "meta");
@@ -38,7 +43,9 @@
 
             public static function index() {
                 if (loadBackend("tt")) {
-                    return [ "GET" ];
+                    return [
+                        "GET"
+                    ];
                 } else {
                     return false;
                 }

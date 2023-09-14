@@ -22,6 +22,7 @@
              * @param $lat
              * @param $lon
              * @param $shared
+             * @param $plog
              * @param $prefix
              * @param $callerId
              * @param $domophoneId
@@ -29,11 +30,10 @@
              * @param $cms
              * @param $cmsType
              * @param $cameraId
-             * @param $locksDisabled
              * @param $cmsLevels
              * @return boolean|integer
              */
-            abstract function createEntrance($houseId, $entranceType, $entrance, $lat, $lon, $shared, $prefix, $callerId, $domophoneId, $domophoneOutput, $cms, $cmsType, $cameraId, $locksDisabled, $cmsLevels);
+            abstract function createEntrance($houseId, $entranceType, $entrance, $lat, $lon, $shared, $plog, $prefix, $callerId, $domophoneId, $domophoneOutput, $cms, $cmsType, $cameraId, $cmsLevels);
 
             /**
              * @param $entranceId
@@ -64,6 +64,7 @@
              * @param $lat
              * @param $lon
              * @param $shared
+             * @param $plog
              * @param $prefix
              * @param $callerId
              * @param $domophoneId
@@ -71,11 +72,10 @@
              * @param $cms
              * @param $cmsType
              * @param $cameraId
-             * @param $locksDisabled
              * @param $cmsLevels
              * @return boolean
              */
-            abstract function modifyEntrance($entranceId, $houseId, $entranceType, $entrance, $lat, $lon, $shared, $prefix, $callerId, $domophoneId, $domophoneOutput, $cms, $cmsType, $cameraId, $locksDisabled, $cmsLevels);
+            abstract function modifyEntrance($entranceId, $houseId, $entranceType, $entrance, $lat, $lon, $shared, $plog, $prefix, $callerId, $domophoneId, $domophoneOutput, $cms, $cmsType, $cameraId, $cmsLevels);
 
             /**
              * @param $entranceId
@@ -111,14 +111,16 @@
              * @param $entrances
              * @param $apartmentsAndLevels
              * @param $manualBlock
+             * @param $adminBlock
              * @param $openCode
+             * @param $plog
              * @param $autoOpen
              * @param $whiteRabbit
              * @param $sipEnabled
              * @param $sipPassword
              * @return boolean|integer
              */
-            abstract function addFlat($houseId, $floor, $flat, $code, $entrances, $apartmentsAndLevels, $manualBlock, $openCode, $autoOpen, $whiteRabbit, $sipEnabled, $sipPassword);
+            abstract function addFlat($houseId, $floor, $flat, $code, $entrances, $apartmentsAndLevels, $manualBlock, $adminBlock, $openCode, $plog, $autoOpen, $whiteRabbit, $sipEnabled, $sipPassword);
 
             /**
              * @param $flatId
@@ -159,41 +161,11 @@
             abstract public function setCms($entranceId, $cms);
 
             /**
-             * @return false|array
-             */
-            abstract public function getDomophones();
-
-            /**
+             * @param $by
+             * @param $query
              * @return mixed
              */
-            public function getAsteriskServers() {
-                return $this->config["asterisk_servers"];
-            }
-
-            /**
-             * @return false|array
-             */
-            public function getAsteriskServer($domophoneId) {
-                $server_ip = $this->getDomophone($domophoneId)['server'];
-
-                foreach ($this->config["asterisk_servers"] as $server) {
-                    if (in_array($server_ip, $server)) {
-                        return $server;
-                    }
-                }
-
-                return false;
-            }
-
-            /**
-             * @return false|array
-             */
-            abstract public function getModels();
-
-            /**
-             * @return false|array
-             */
-            abstract public function getCMSes();
+            abstract public function getDomophones($by = "all", $query = -1);
 
             /**
              * @param $enabled
@@ -201,14 +173,12 @@
              * @param $server
              * @param $url
              * @param $credentials
-             * @param $callerId
              * @param $dtmf
-             * @param $syslog
              * @param $nat
              * @param $comment
              * @return false|integer
              */
-            abstract public function addDomophone($enabled, $model, $server, $url, $credentials, $callerId, $dtmf, $syslog, $nat, $comment);
+            abstract public function addDomophone($enabled, $model, $server, $url, $credentials, $dtmf, $nat, $comment);
 
             /**
              * @param $domophoneId
@@ -217,14 +187,19 @@
              * @param $server
              * @param $url
              * @param $credentials
-             * @param $callerId
              * @param $dtmf
-             * @param $syslog
+             * @param $firstTime
              * @param $nat
+             * @param $locksAreOpen
              * @param $comment
              * @return boolean
              */
-            abstract public function modifyDomophone($domophoneId, $enabled, $model, $server, $url, $credentials, $callerId, $dtmf, $syslog, $nat, $comment);
+            abstract public function modifyDomophone($domophoneId, $enabled, $model, $server, $url, $credentials, $dtmf, $firstTime, $nat, $locksAreOpen, $comment);
+
+            /**
+             * @param $domophoneId
+             */
+            abstract public function autoconfigDone($domophoneId);
 
             /**
              * @param $domophoneId
@@ -239,12 +214,6 @@
             abstract public function getDomophone($domophoneId);
 
             /**
-             * @param $cameraId
-             * @return false|array
-             */
-            abstract public function getCamera($cameraId);
-
-            /**
              * @param $by - "id", "mobile", "flat", "...?"
              * @param $query
              * @return false|array
@@ -255,10 +224,11 @@
              * @param $mobile
              * @param $name
              * @param $patronymic
-             * @param $flatId
+             * @param bool $flatId
+             * @param null $message
              * @return boolean|integer
              */
-            abstract public function addSubscriber($mobile, $name, $patronymic, $flatId = false);
+            abstract public function addSubscriber($mobile, $name, $patronymic, $flatId = false, $message = false);
 
             /**
              * @param $subscriberId
@@ -272,6 +242,13 @@
              * @return boolean
              */
             abstract public function deleteSubscriber($subscriberId);
+
+            /**
+             * @param $flatId
+             * @param $subscriberId
+             * @return mixed
+             */
+            abstract public function removeSubscriberFromFlat($flatId, $subscriberId);
 
             /**
              * @param $subscriberId
@@ -325,19 +302,10 @@
             /**
              * @param $to
              * @param $id
-             * @param $list
-             * @return mixed
-             */
-            abstract public function setCameras($to, $id, $list);
-
-            /**
-             * @param $to
-             * @param $id
              * @param $cameraId
-             * @param $options
              * @return mixed
              */
-            abstract public function addCamera($to, $id, $cameraId, $options);
+            abstract public function addCamera($to, $id, $cameraId);
 
             /**
              * @param $from

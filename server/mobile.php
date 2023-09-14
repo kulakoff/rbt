@@ -10,6 +10,7 @@ require_once "utils/checkstr.php";
 require_once "utils/purifier.php";
 require_once "utils/error.php";
 require_once "utils/apache_request_headers.php";
+require_once "utils/i18n.php";
 
 
 $LanTa_services = [
@@ -34,10 +35,15 @@ $emptyStreetIdOffset = 1000000;
 try {
     $config = @json_decode(file_get_contents(__DIR__ . "/config/config.json"), true);
 } catch (Exception $e) {
-    error_log(print_r($e, true));
-    response(555, [
-        "error" => "config",
-    ]);
+    $config = false;
+}
+
+if (!$config) {
+    try {
+        $config = @json_decode(json_encode(yaml_parse_file(__DIR__ . "/config/config.yml")), true);
+    } catch (Exception $e) {
+        $config = false;
+    }
 }
 
 if (!$config) {
@@ -66,7 +72,6 @@ try {
 
 try {
     $db = new PDO_EXT(@$config["db"]["dsn"], @$config["db"]["username"], @$config["db"]["password"], @$config["db"]["options"]);
-    $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 } catch (Exception $e) {
     error_log(print_r($e, true));
     response(555, [
@@ -75,7 +80,7 @@ try {
 }
 
 function response($code = 204, $data = false, $name = false, $message = false) {
-    global $response_data_source, $response_cahce_req, $response_cache_ttl;
+    global $response_data_source, $response_cache_req, $response_cache_ttl;
     $response_codes = [
         200 => [ 'name' => 'OK', 'message' => 'Хорошо' ],
         201 => [ 'name' => 'Created', 'message' => 'Создано' ],
@@ -122,8 +127,8 @@ function response($code = 204, $data = false, $name = false, $message = false) {
     ];
     header('Content-Type: application/json');
     http_response_code($code);
-    if ((int)$code < 300 && $response_cahce_req && $response_data_source == 'db' && (int)$response_cache_ttl > 0) {
-//        $redis->setEx($response_cahce_req, $response_cache_ttl, json_encode([
+    if ((int)$code < 300 && $response_cache_req && $response_data_source == 'db' && (int)$response_cache_ttl > 0) {
+//        $redis->setEx($response_cache_req, $response_cache_ttl, json_encode([
 //            'code' => $code,
 //            'data' => $data,
 //        ], JSON_UNESCAPED_UNICODE));
@@ -212,7 +217,20 @@ function auth($_response_cache_ttl = -1) {
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $raw_postdata = file_get_contents("php://input");
     $postdata = json_decode($raw_postdata, true);
-    $m = explode('/', $_SERVER["REQUEST_URI"]);
+
+    $path = explode("?", $_SERVER["REQUEST_URI"])[0];
+
+    $server = parse_url($config["api"]["mobile"]);
+
+    if ($server && $server['path']) {
+        $path = substr($path, strlen($server['path']));
+    }
+
+    $path = trim($path, '/');
+    $m = explode('/', $path);
+
+    array_unshift($m, "mobile");
+    array_unshift($m, false);
 
     if (count($m) == 4 && !$m[0] && $m[1] == 'mobile') {
         $module = $m[2];
@@ -220,11 +238,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         if (file_exists(__DIR__ . "/mobile/{$module}/{$method}.php")) {
             $b = @explode(' ', $_SERVER['HTTP_AUTHORIZATION'])[1];
             if ($b) {
-                $response_cahce_req = strtolower($module . '-' . $method . '-' . $b . '-' . md5(serialize($postdata)));
-//                $cache = @json_decode($redis->get($response_cahce_req), true);
+                $response_cache_req = strtolower($module . '-' . $method . '-' . $b . '-' . md5(serialize($postdata)));
+//                $cache = @json_decode($redis->get($response_cache_req), true);
                 $cache = false;
             } else {
-                $response_cahce_req = false;
+                $response_cache_req = false;
                 $cache = false;
             }
             if ($cache && !array_key_exists('X-Dm-Api-Refresh', apache_request_headers())) {
@@ -232,6 +250,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 //                $response_data_source = 'cache';
 //                header("X-Dm-Api-Data-Source: $response_data_source");
 //                response($cache['code'], $cache['data']);
+                $response_data_source = 'db';
+                $response_cache_ttl = 60;
+                header("X-Dm-Api-Data-Source: $response_data_source");
+                require_once __DIR__ . "/mobile/{$module}/{$method}.php";
             } else {
                 if (array_key_exists('X-Dm-Api-Refresh', apache_request_headers())) {
                     // $redis->incr('cache-force-miss');

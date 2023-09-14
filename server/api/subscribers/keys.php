@@ -20,7 +20,6 @@ namespace api\subscribers
         {
             $households = loadBackend("households");
 
-            $keys = $households->getKeys(@$params["by"], @$params["query"]);
 
             return api::ANSWER($keys, ($keys !== false)?"keys":false);
         }
@@ -28,7 +27,7 @@ namespace api\subscribers
         public static function index()
         {
             return [
-                "GET" => "#same(subscribers,key,GET)",
+                "GET" => "#same(addresses,house,GET)",
             ];
         }
     }

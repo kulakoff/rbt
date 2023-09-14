@@ -26,12 +26,14 @@ function cardTable(params) {
         if (params.title.filter) {
             filterInput = md5(guid());
             h += `<div class="card-tools d-none d-md-block">`;
+            h += '<form autocomplete="off">';
             h += `<div class="input-group input-group-sm">`;
             h += `<input id="${filterInput}" type="text" class="form-control float-right table-search-input" placeholder="${i18n("filter")}">`;
             h += `<div class="input-group-append">`;
             h += `<button type="submit" class="btn btn-default" id="${filterInput}-search-button"><i class="fas fa-filter"></i></button>`;
             h += `</div>`;
             h += `</div>`;
+            h += '</form>';
             h += `</div>`;
         }
         h += `</div>`;
@@ -52,7 +54,11 @@ function cardTable(params) {
         allRows = params.rows();
     }
 
-    doFilter(params.title.filter);
+    if (params && params.title) {
+        doFilter(params.title.filter);
+    } else {
+        doFilter();
+    }
 
     while (currentPage > Math.ceil(rows.length / pageLength) && currentPage > 1) {
         currentPage--;
@@ -82,6 +88,9 @@ function cardTable(params) {
         h += `<th><i class="fa fa-fw"></i></th>`;
     }
     for (let i in params.columns) {
+        if (params.columns[i].hidden) {
+            continue;
+        }
         if (params.columns[i].fullWidth) {
             h += `<th nowrap style="width: 100%">${params.columns[i].title}</th>`;
         } else {
@@ -113,9 +122,12 @@ function cardTable(params) {
             }
             h += `>`;
             if (typeof params.edit === "function") {
-                h += `<td class="hoverable ${editClass}" uid="${rows[i].uid}" title="${i18n("edit")}"><i class="far fa-faw fa-edit"></i></td>`;
+                h += `<td class="hoverable pointer ${editClass}" uid="${rows[i].uid}" title="${i18n("edit")}"><i class="far fa-faw fa-edit"></i></td>`;
             }
             for (let j in rows[i].cols) {
+                if (rows[i].cols[j].hidden) {
+                    continue;
+                }
                 h += `<td rowId="${i}" colId="${j}" uid="${rows[i].uid}"`;
                 let clss = '';
                 if (typeof rows[i].cols[j].click === "function") {
@@ -319,7 +331,9 @@ function cardTable(params) {
 
         if (typeof text !== "function" && text && text !== true) {
             rows = [];
-            let words = text.toString().toLowerCase().split(/\W+/);
+            let words = text.toString().trim().toLowerCase().split(/\s+/).filter((value, index, self) => {
+                return self.indexOf(value) === index;
+            });
             for (let i in allRows) {
                 if (match(allRows[i], words)) {
                     rows.push(allRows[i]);
@@ -363,17 +377,17 @@ function cardTable(params) {
             $("#" + tfoot).hide();
         }
 
-        if (titleButton && params.title.button && typeof params.title.button.click === "function") {
+        if (titleButton && params && params.title && params.title.button && typeof params.title.button.click === "function") {
             $("#" + titleButton).off("click").on("click", params.title.button.click);
         }
 
-        if (altButton && params.title.altButton && typeof params.title.altButton.click === "function") {
+        if (altButton && params && params.title && params.title.altButton && typeof params.title.altButton.click === "function") {
             $("#" + altButton).off("click").on("click", params.title.altButton.click);
         }
 
         addHandlers();
 
-        if (params.title.filter) {
+        if (params && params.title && params.title.filter) {
             $("#" + filterInput).off("keyup").on("keyup", e => {
                 if (filterTimeout) {
                     clearTimeout(filterTimeout);
@@ -393,7 +407,7 @@ function cardTable(params) {
                     params.filterChange(f);
                 }
             });
-            if (params.title.filter && params.title.filter !== true) {
+            if (params && params.title && params.title.filter && params.title.filter !== true) {
                 $("#" + filterInput).val(params.title.filter);
                 doFilter(params.title.filter, true);
             }

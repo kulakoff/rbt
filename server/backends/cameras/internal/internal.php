@@ -26,6 +26,11 @@ namespace backends\cameras
                     $p = [
                         "camera_id" => $params,
                     ];
+                    break;
+
+                case "common":
+                    $q = "select * from cameras where common = 1";
+                    break;
             }
 
             return $this->db->get($q, $p, [
@@ -35,13 +40,19 @@ namespace backends\cameras
                 "url" => "url",
                 "stream" => "stream",
                 "credentials" => "credentials",
-                "publish" => "publish",
-                "flussonic" => "flussonic",
+                "name" => "name",
+                "dvr_stream" => "dvrStream",
+                "timezone" => "timezone",
                 "lat" => "lat",
                 "lon" => "lon",
                 "direction" => "direction",
                 "angle" => "angle",
                 "distance" => "distance",
+                "frs" => "frs",
+                "md_left" => "mdLeft",
+                "md_top" => "mdTop",
+                "md_width" => "mdWidth",
+                "md_height" => "mdHeight",
                 "common" => "common",
                 "comment" => "comment"
             ]);
@@ -68,13 +79,14 @@ namespace backends\cameras
         /**
          * @inheritDoc
          */
-        public function addCamera($enabled, $model, $url,  $stream, $credentials, $publish, $flussonic, $lat, $lon, $direction, $angle, $distance, $common, $comment)
+        public function addCamera($enabled, $model, $url,  $stream, $credentials, $name, $dvrStream, $timezone, $lat, $lon, $direction, $angle, $distance, $frs, $mdLeft, $mdTop, $mdWidth, $mdHeight, $common, $comment)
         {
             if (!$model) {
                 return false;
             }
 
-            $models = $this->getModels();
+            $configs = loadBackend("configs");
+            $models = $configs->getCamerasModels();
 
             if (!@$models[$model]) {
                 return false;
@@ -84,19 +96,29 @@ namespace backends\cameras
                 return false;
             }
 
-            return $this->db->insert("insert into cameras (enabled, model, url, stream, credentials, publish, flussonic, lat, lon, direction, angle, distance, common, comment) values (:enabled, :model, :url, :stream, :credentials, :publish, :flussonic, :lat, :lon, :direction, :angle, :distance, :common, :comment)", [
+            if (!checkInt($mdLeft) || !checkInt($mdTop) || !checkInt($mdWidth) || !checkInt($mdHeight)) {
+                return false;
+            }
+
+            return $this->db->insert("insert into cameras (enabled, model, url, stream, credentials, name, dvr_stream, timezone, lat, lon, direction, angle, distance, frs, md_left, md_top, md_width, md_height, common, comment) values (:enabled, :model, :url, :stream, :credentials, :name, :dvr_stream, :timezone, :lat, :lon, :direction, :angle, :distance, :frs, :md_left, :md_top, :md_width, :md_height, :common, :comment)", [
                 "enabled" => (int)$enabled,
                 "model" => $model,
                 "url" => $url,
                 "stream" => $stream,
                 "credentials" => $credentials,
-                "publish" => $publish,
-                "flussonic" => $flussonic,
+                "name" => $name,
+                "dvr_stream" => $dvrStream,
+                "timezone" => $timezone,
                 "lat" => $lat,
                 "lon" => $lon,
                 "direction" => $direction,
                 "angle" => $angle,
                 "distance" => $distance,
+                "frs" => $frs,
+                "md_left" => $mdLeft,
+                "md_top" => $mdTop,
+                "md_width" => $mdWidth,
+                "md_height" => $mdHeight,
                 "common" => $common,
                 "comment" => $comment,
             ]);
@@ -105,7 +127,7 @@ namespace backends\cameras
         /**
          * @inheritDoc
          */
-        public function modifyCamera($cameraId, $enabled, $model, $url, $stream, $credentials, $publish, $flussonic, $lat, $lon, $direction, $angle, $distance, $common, $comment)
+        public function modifyCamera($cameraId, $enabled, $model, $url, $stream, $credentials, $name, $dvrStream, $timezone, $lat, $lon, $direction, $angle, $distance, $frs, $mdLeft, $mdTop, $mdWidth, $mdHeight, $common, $comment)
         {
             if (!checkInt($cameraId)) {
                 setLastError("noId");
@@ -117,7 +139,8 @@ namespace backends\cameras
                 return false;
             }
 
-            $models = $this->getModels();
+            $configs = loadBackend("configs");
+            $models = $configs->getCamerasModels();
 
             if (!@$models[$model]) {
                 setLastError("modelUnknown");
@@ -128,19 +151,25 @@ namespace backends\cameras
                 return false;
             }
 
-            return $this->db->modify("update cameras set enabled = :enabled, model = :model, url = :url, stream = :stream, credentials = :credentials, publish = :publish, flussonic = :flussonic, lat = :lat, lon = :lon, direction = :direction, angle = :angle, distance = :distance, common = :common, comment = :comment where camera_id = $cameraId", [
+            return $this->db->modify("update cameras set enabled = :enabled, model = :model, url = :url, stream = :stream, credentials = :credentials, name = :name, dvr_stream = :dvr_stream, timezone = :timezone, lat = :lat, lon = :lon, direction = :direction, angle = :angle, distance = :distance, frs = :frs, md_left = :md_left, md_top = :md_top, md_width = :md_width, md_height = :md_height, common = :common, comment = :comment where camera_id = $cameraId", [
                 "enabled" => (int)$enabled,
                 "model" => $model,
                 "url" => $url,
                 "stream" => $stream,
                 "credentials" => $credentials,
-                "publish" => $publish,
-                "flussonic" => $flussonic,
+                "name" => $name,
+                "dvr_stream" => $dvrStream,
+                "timezone" => $timezone,
                 "lat" => $lat,
                 "lon" => $lon,
                 "direction" => $direction,
                 "angle" => $angle,
                 "distance" => $distance,
+                "frs" => $frs,
+                "md_left" => $mdLeft,
+                "md_top" => $mdTop,
+                "md_width" => $mdWidth,
+                "md_height" => $mdHeight,
                 "common" => $common,
                 "comment" => $comment,
             ]);
@@ -162,19 +191,21 @@ namespace backends\cameras
         /**
          * @inheritDoc
          */
-        public function getModels()
-        {
-            $files = scandir(__DIR__ . "/../../../hw/cameras/models");
+        public function cron($part) {
+            if ($part === "hourly") {
+                $cameras = $this->db->get("select camera_id, url from cameras");
 
-            $models = [];
+                foreach ($cameras as $camera) {
+                    $ip = gethostbyname(parse_url($camera['url'], PHP_URL_HOST));
 
-            foreach ($files as $file) {
-                if (substr($file, -5) === ".json") {
-                    $models[$file] = json_decode(file_get_contents(__DIR__ . "/../../../hw/cameras/models/" . $file), true);
+                    if (filter_var($ip, FILTER_VALIDATE_IP) !== false) {
+                        $this->db->modify("update cameras set ip = :ip where camera_id = " . $camera['camera_id'], [
+                            "ip" => $ip,
+                        ]);
+                    }
                 }
             }
-
-            return $models;
+            return true;
         }
     }
 }

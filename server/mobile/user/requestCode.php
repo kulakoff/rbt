@@ -9,7 +9,7 @@
  *
  * @apiParam {String{11}} userPhone номер телефона
  *
- * @apiSuccess {string="sms","outgoingCall","flashCall"} [method="sms"] способ авторизации
+ * @apiSuccess {string="sms","outgoingCall"} [method="sms"] способ авторизации
  * @apiSuccess {string[]} [confirmationNumbers] список номеров для авторизации исходящим звонком (outgoingCall)
  *
  * @apiErrorExample Ошибки
@@ -18,35 +18,30 @@
  */
 
     $user_phone = @$postdata['userPhone'];
-    $user_phone[0] = '8';
+    if ($user_phone[0] == '8') { 
+        $user_phone[0] = '7'; 
+    }
     $isdn = loadBackend("isdn");
 
-    if (strlen($user_phone) == 11 && ctype_digit($user_phone)) {
+    if (ctype_digit($user_phone)) {
 
-        $confirmMethod = @$config["backends"]["isdn"]["confirmMethod"] ?: "smsCode";
+        $confirmMethod = @$config["backends"]["isdn"]["confirm_method"] ?: "outgoingCall";
         
         switch ($confirmMethod) {
             case 'outgoingCall':
                 response(200, [ "method" => "outgoingCall", "confirmationNumbers" => $isdn->confirmNumbers()]);
                 break;
 
-            case 'flashCall':
-                $isdn->flashCall($user_phone);
-                $redis->del("userpin_".$user_phone);
-                $redis->del("userpin.attempts_".$user_phone);
-                response(200, [ "method" => "flashCall" ]);
-                break;
-            
             default:
                 // smsCode - default
                 $already = $redis->get("userpin_".$user_phone);
                 if ($already){
                     response(429);
                 } else {
-                    if ($user_phone == '89123456781') { // фейковый аккаунт №1
+                    if ($user_phone == '79123456781') { // фейковый аккаунт №1
                         $pin = '1001';
                     } else
-                    if ($user_phone == '89123456782') { // фейковый аккаунт №2
+                    if ($user_phone == '79123456782') { // фейковый аккаунт №2
                         $pin = '1002';
                     } else {
                         $pin = explode(":", $isdn->sendCode($user_phone))[0];

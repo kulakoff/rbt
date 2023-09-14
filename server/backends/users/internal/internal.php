@@ -13,14 +13,20 @@
         class internal extends users {
 
             /**
-             * list of all users
-             *
-             * @return array|false
+             * @inheritDoc
              */
 
-            public function getUsers() {
+            public function getUsers($withSessions = false) {
+                if (!$withSessions) {
+
+                    $cache = $this->cacheGet("USERS");
+                    if ($cache) {
+                        return $cache;
+                    }
+                }
+
                 try {
-                    $users = $this->db->query("select uid, login, real_name, e_mail, phone, enabled from core_users order by uid", \PDO::FETCH_ASSOC)->fetchAll();
+                    $users = $this->db->query("select uid, login, real_name, e_mail, phone, tg, enabled, primary_group, acronym primary_group_acronym from core_users left join core_groups on core_users.primary_group = core_groups.gid order by real_name, login, uid", \PDO::FETCH_ASSOC)->fetchAll();
                     $_users = [];
 
                     foreach ($users as $user) {
@@ -30,13 +36,61 @@
                             "realName" => $user["real_name"],
                             "eMail" => $user["e_mail"],
                             "phone" => $user["phone"],
+                            "tg" => $user["tg"],
                             "enabled" => $user["enabled"],
+                            "lastLogin" => $withSessions?$this->redis->get("last_login_" . md5($user["login"])):false,
+                            "lastAction" => $withSessions?$this->redis->get("last_action_" . md5($user["login"])):false,
+                            "primaryGroup" => $user["primary_group"],
+                            "primaryGroupAcronym" => $user["primary_group_acronym"],
                         ];
                     }
 
+                    if ($withSessions) {
+                        $a = loadBackend("authorization");
+
+                        if ($a->allow([
+                            "_uid" => $this->uid,
+                            "_path" => [
+                                "api" => "accounts",
+                                "method" => "user",
+                            ],
+                            "_request_method" => "POST",
+                        ])) {
+                            foreach ($_users as &$u) {
+                                $u["sessions"] = [];
+                                $lk = $this->redis->keys("auth_*_{$u["uid"]}");
+                                foreach ($lk as $k) {
+                                    $u["sessions"][] = json_decode($this->redis->get($k), true);
+                                }
+                                $pk = $this->redis->keys("persistent_*_{$u["uid"]}");
+                                foreach ($pk as $k) {
+                                    $s = json_decode($this->redis->get($k), true);
+                                    $s["byPersistentToken"] = true;
+                                    $u["sessions"][] = $s;
+                                }
+                            }
+                        } else {
+                            foreach ($_users as &$u) {
+                                unset($u["lastLogin"]);
+                                unset($u["lastAction"]);
+                            }
+                        }
+                    } else {
+                        foreach ($_users as &$u) {
+                            unset($u["lastLogin"]);
+                            unset($u["lastAction"]);
+                        }
+                    }
+
+                    if (!$withSessions) {
+                        $this->cacheSet("USERS", $_users);
+                    }
                     return $_users;
                 } catch (\Exception $e) {
                     error_log(print_r($e, true));
+                    if (!$withSessions) {
+                        $this->unCache("USERS");
+                    }
                     return false;
                 }
             }
@@ -50,13 +104,19 @@
              */
 
             public function getUser($uid) {
+                $key = "USER:$uid";
+
+                $cache = $this->cacheGet($key);
+                if ($cache) {
+                    return $cache;
+                }
 
                 if (!checkInt($uid)) {
                     return false;
                 }
 
                 try {
-                    $user = $this->db->query("select uid, login, real_name, e_mail, phone, enabled, default_route from core_users where uid = $uid", \PDO::FETCH_ASSOC)->fetchAll();
+                    $user = $this->db->queryEx("select uid, login, real_name, e_mail, phone, tg, notification, enabled, default_route, primary_group, acronym primary_group_acronym from core_users left join core_groups on core_users.primary_group = core_groups.gid where uid = $uid");
 
                     if (count($user)) {
                         $_user = [
@@ -65,8 +125,12 @@
                             "realName" => $user[0]["real_name"],
                             "eMail" => $user[0]["e_mail"],
                             "phone" => $user[0]["phone"],
+                            "tg" => $user[0]["tg"],
+                            "notification" => $user[0]["notification"],
                             "enabled" => $user[0]["enabled"],
                             "defaultRoute" => $user[0]["default_route"],
+                            "primaryGroup" => $user[0]["primary_group"],
+                            "primaryGroupAcronym" => $user[0]["primary_group_acronym"],
                         ];
 
                         $groups = loadBackend("groups");
@@ -75,12 +139,26 @@
                             $_user["groups"] = $groups->getGroups($uid);
                         }
 
+                        $persistent = false;
+                        $_keys = $this->redis->keys("persistent_*_" . $user[0]["uid"]);
+                        foreach ($_keys as $_key) {
+                            $persistent = explode("_", $_key)[1];
+                            break;
+                        }
+
+                        if ($persistent) {
+                            $_user["persistentToken"] = $persistent;
+                        }
+
+                        $this->cacheSet($key, $_user);
                         return $_user;
                     } else {
+                        $this->unCache($key);
                         return false;
                     }
                 } catch (\Exception $e) {
                     error_log(print_r($e, true));
+                    $this->unCache($key);
                     return false;
                 }
             }
@@ -96,7 +174,9 @@
              * @return integer|false
              */
 
-            public function addUser($login, $realName = '', $eMail = '', $phone = '') {
+            public function addUser($login, $realName = null, $eMail = null, $phone = null) {
+                $this->clearCache();
+
                 $login = trim($login);
                 $password = generatePassword();
 
@@ -105,12 +185,14 @@
                     if ($sth->execute([
                         ":login" => $login,
                         ":password" => password_hash($password, PASSWORD_DEFAULT),
-                        ":real_name" => trim($realName),
-                        ":e_mail" => trim($eMail),
-                        ":phone" => trim($phone),
+                        ":real_name" => $realName?trim($realName):null,
+                        ":e_mail" => $eMail?trim($eMail):null,
+                        ":phone" => $phone?trim($phone):null,
                     ])) {
                         $uid = $this->db->lastInsertId();
-                        eMail($this->config, trim($eMail), "new user", "your new password is $password");
+                        if ($eMail) {
+                            eMail($this->config, trim($eMail), "new user", "your new password is $password");
+                        }
                         return $uid;
                     } else {
                         return false;
@@ -131,6 +213,8 @@
              */
 
             public function setPassword($uid, $password) {
+                $this->clearCache();
+
                 if (!checkInt($uid) || !trim($password)) {
                     return false;
                 }
@@ -161,13 +245,26 @@
              */
 
             public function deleteUser($uid) {
+                $this->clearCache();
+
                 if (!checkInt($uid)) {
                     return false;
                 }
 
                 if ($uid > 0) { // admin cannot be deleted
+                    $user = $this->getUser($uid);
+
+                    $this->redis->del("last_login_" . md5($user["login"]));
+                    $this->redis->del("last_action_" . md5($user["login"]));
+
                     try {
                         $this->db->exec("delete from core_users where uid = $uid");
+
+                        $_keys = $this->redis->keys("persistent_*_" . $uid);
+                        foreach ($_keys as $_key) {
+                            $this->redis->del($_key);
+                        }
+
                         $groups = loadBackend("groups");
                         if ($groups) {
                             $groups->deleteUser($uid);
@@ -183,31 +280,72 @@
             }
 
             /**
-             * modify user data
-             *
-             * @param integer $uid
-             * @param string $realName
-             * @param string $eMail
-             * @param string $phone
-             * @param boolean $enabled
-             *
-             * @return boolean
+             * @inheritDoc
              */
+            public function modifyUser($uid, $realName = '', $eMail = '', $phone = '', $tg = '', $notification = 'tgEmail', $enabled = true, $defaultRoute = '', $persistentToken = false, $primaryGroup = -1) {
+                $this->clearCache();
 
-            public function modifyUser($uid, $realName = '', $eMail = '', $phone = '', $enabled = true, $defaultRoute = '#') {
                 if (!checkInt($uid)) {
                     return false;
                 }
 
+                if (!in_array($notification, [ "none", "tgEmail", "emailTg", "tg", "email" ])) {
+                    return false;
+                }
+
+                $user = $this->getUser($uid);
+                
                 try {
-                    $sth = $this->db->prepare("update core_users set real_name = :real_name, e_mail = :e_mail, phone = :phone, enabled = :enabled, default_route = :default_route where uid = $uid");
-                    return $sth->execute([
-                        ":real_name" => trim($realName),
-                        ":e_mail" => trim($eMail),
-                        ":phone" => trim($phone),
-                        ":enabled" => $enabled?"1":"0",
-                        ":default_route" => trim($defaultRoute),
-                    ]);
+                    $a = loadBackend("authorization");
+
+                    if ($a->mAllow("accounts", "groupUsers", "PUT")) {
+                        $sth = $this->db->prepare("update core_users set real_name = :real_name, e_mail = :e_mail, phone = :phone, tg = :tg, notification = :notification, enabled = :enabled, default_route = :default_route, primary_group = :primary_group where uid = $uid");
+                    } else {
+                        $sth = $this->db->prepare("update core_users set real_name = :real_name, e_mail = :e_mail, phone = :phone, tg = :tg, notification = :notification, enabled = :enabled, default_route = :default_route where uid = $uid");
+                    }
+
+                    if ($persistentToken && strlen(trim($persistentToken)) === 32 && $uid && $enabled) {
+                        $this->redis->set("persistent_" . trim($persistentToken) . "_" . $uid, json_encode([
+                            "uid" => $uid,
+                            "login" => $this->db->get("select login from core_users where uid = $uid", false, false, [ "fieldlify" ]),
+                            "started" => time(),
+                        ]));
+                    } else {
+                        $_keys = $this->redis->keys("persistent_*_" . $uid);
+                        foreach ($_keys as $_key) {
+                            $this->redis->del($_key);
+                        }
+                    }
+
+                    if (!$enabled) {
+                        $_keys = $this->redis->keys("auth_*_" . $uid);
+                        foreach ($_keys as $_key) {
+                            $this->redis->del($_key);
+                        }
+                    }
+
+                    if ($a->mAllow("accounts", "groupUsers", "PUT")) {
+                        return $sth->execute([
+                            ":real_name" => trim($realName),
+                            ":e_mail" => trim($eMail)?trim($eMail):null,
+                            ":phone" => trim($phone),
+                            ":tg" => trim($tg),
+                            ":notification" => trim($notification),
+                            ":enabled" => $enabled?"1":"0",
+                            ":default_route" => trim($defaultRoute),
+                            ":primary_group" => (int)$primaryGroup,
+                        ]);
+                    } else {
+                        return $sth->execute([
+                            ":real_name" => trim($realName),
+                            ":e_mail" => trim($eMail)?trim($eMail):null,
+                            ":phone" => trim($phone),
+                            ":tg" => trim($tg),
+                            ":notification" => trim($notification),
+                            ":enabled" => $enabled?"1":"0",
+                            ":default_route" => trim($defaultRoute),
+                        ]);
+                    }
                 } catch (\Exception $e) {
                     error_log(print_r($e, true));
                     return false;
@@ -263,16 +401,45 @@
                     "delete from core_users_rights where uid not in (select uid from core_users)",
                     "delete from core_groups_rights where gid not in (select gid from core_groups)",
                     "delete from core_users_groups where uid not in (select uid from core_users)",
-                    "delete from core_users_groups where gid not in (select uid from core_groups)",
+                    "delete from core_users_groups where gid not in (select gid from core_groups)",
                 ];
 
                 for ($i = 0; $i < count($c); $i++) {
-                    $del = $this->db->prepare($c[$i]);
-                    $del->execute();
-                    $n += $del->rowCount();
+                    $n += $this->db->modify($c[$i]);
                 }
 
                 return $n;
+            }
+
+            /**
+             * @inheritDoc
+             */
+            public function getUidByLogin($login)
+            {
+                $key = "UIDBYLOGIN:$login";
+
+                $cache = $this->cacheGet($key);
+                if ($cache) {
+                    return $cache;
+                }
+
+                try {
+                    $users = $this->db->get("select uid from core_users where login = :login", [
+                        "login" => $login,
+                    ], [
+                        "uid" => "uid",
+                    ]);
+                    if (count($users)) {
+                        $this->cacheSet($key, (int)$users[0]["uid"]);
+                        return (int)$users[0]["uid"];
+                    } else {
+                        $this->unCache($key);
+                        return false;
+                    }
+                } catch (\Exception $e) {
+                    $this->unCache($key);
+                    return false;
+                }
             }
         }
     }

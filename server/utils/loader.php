@@ -7,10 +7,13 @@
      * @return false|object
      */
 
-    function loadBackend($backend) {
+    function loadBackend($backend, $login = false) {
         global $config, $db, $redis, $backends;
 
         if (@$backends[$backend]) {
+            if ($login) {
+                $backends[$backend]->setLogin($login);
+            }
             return $backends[$backend];
         } else {
             if (@$config["backends"][$backend]) {
@@ -21,17 +24,17 @@
                     if (file_exists(__DIR__ . "/../backends/$backend/" . $config["backends"][$backend]["backend"] . "/" . $config["backends"][$backend]["backend"] . ".php")) {
                         require_once __DIR__ . "/../backends/$backend/" . $config["backends"][$backend]["backend"] . "/" . $config["backends"][$backend]["backend"] . ".php";
                         $className = "backends\\$backend\\" . $config["backends"][$backend]["backend"];
-                        $backends[$backend] = new $className($config, $db, $redis);
+                        $backends[$backend] = new $className($config, $db, $redis, $login);
+                        $backends[$backend]->backend = $backend;
                         return $backends[$backend];
                     } else {
                         return false;
                     }
                 } catch (Exception $e) {
-                    setLastError("cantLoadBackend");
+                    setLastError(i18n("cantLoadBackend", $backend));
                     return false;
                 }
             } else {
-                setLastError("backendNotFound");
                 return false;
             }
         }

@@ -21,5 +21,21 @@
             public function log($params, $code) {
                 // do nothing
             }
+
+            /**
+             * @inheritDoc
+             */
+            public function raw($ip, $unit, $msg)
+            {
+                // do nothing
+            }
+
+            /**
+             * @inheritDoc
+             */
+            public function get($query)
+            {
+                // TODO: Implement get() method.
+            }
         }
     }

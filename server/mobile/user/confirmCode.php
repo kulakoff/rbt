@@ -21,22 +21,18 @@
  * @apiSuccess {String} names.patronymic отчество
  */
     $user_phone = @$postdata['userPhone'];
-    $user_phone[0] = '8';
+    if ($user_phone[0] == '8') { 
+        $user_phone[0] = '7'; 
+    }
     $pin = @$postdata['smsCode'];
     $isdn = loadBackend("isdn");
     $households = loadBackend("households");
-    $confirmMethod = @$config["backends"]["isdn"]["confirmMethod"] ?: "smsCode";
+    $confirmMethod = @$config["backends"]["isdn"]["confirm_method"] ?: "outgoingCall";
 
-    if (strlen($user_phone) == 11 && strlen($pin) == 4) {
+    if (strlen($pin) == 4) {
         $pinreq = $redis->get("userpin_".$user_phone);
 
-        if ($confirmMethod == 'flashCall' && !$pinreq) {
-            $pinreq = $isdn->getCode($user_phone);
-            if ($pinreq) {
-                $redis->setex("userpin_".$user_phone, 60, $pinreq);
-            }
-        } 
-        $redis->incr("userpin.attempts_".$user_phone);
+        $redis->setex("userpin.attempts_".$user_phone, 3600, (int)$redis->get("userpin.attempts_".$user_phone) + 1);
 
         if (!$pinreq) {
             response(404);

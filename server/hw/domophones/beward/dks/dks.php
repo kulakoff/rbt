@@ -6,11 +6,11 @@
 
         abstract class dks extends domophones {
 
-            public $user = 'admin';
+            public string $user = 'admin';
 
-            protected $def_pass = 'admin';
+            protected string $def_pass = 'admin';
 
-            protected $cms_models = [
+            protected array $cms_models = [
                 'COM-25U' => 0,
                 'COM-80U' => 1,
                 'COM-100U' => 2,
@@ -28,6 +28,7 @@
                 'KM100-7.5' => 14,
                 'KKM-100S2' => 15,
                 'KKM-105' => 16,
+                'KKM-108' => 19,
                 'Factorial8x8' => 17,
                 'KAD2501' => 18,
             ];
@@ -117,7 +118,7 @@
                 $this->api_call('cgi-bin/intercom_cgi', [ 'action' => 'set', $name => $value ]);
             }
 
-            public function add_rfid(string $code) {
+            public function add_rfid(string $code, int $apartment = 0) {
                 $this->api_call('cgi-bin/rfid_cgi', [ 'action' => 'add', 'Key' => $code ]);
             }
 
@@ -167,8 +168,8 @@
                 ];
 
                 if (count($levels) == 2) {
-                    $params[] = [ 'HandsetUpLevel' => $levels[0] ];
-                    $params[] = [ 'DoorOpenLevel' => $levels[1] ];
+                    $params['HandsetUpLevel'] = $levels[0];
+                    $params['DoorOpenLevel'] = $levels[1];
                 }
 
                 for ($i = 1; $i <= count($sip_numbers); $i++) {
@@ -188,7 +189,7 @@
                     $units = $offset%10;
                     $dozens = intdiv($offset, 10);
                 }
-                else if ($cms_model == 'COM-220U') {
+                elseif ($cms_model == 'COM-220U') {
                     $cms = intdiv($offset, 220);
                     if ($offset%220 == 0) {
                         $units = 0;
@@ -258,7 +259,13 @@
                 $this->api_call('cgi-bin/gate_cgi', $params);
             }
 
-            public function configure_md(int $sensitivity, int $left = 0, int $top = 0, int $width = 0, int $height = 0) {
+            public function configure_md(
+                int $sensitivity = 4,
+                int $left = 0,
+                int $top = 0,
+                int $width = 705,
+                int $height = 576
+            ) {
                 $params = [
                     'sens' => $sensitivity ? ($sensitivity - 1) : 0,
                     'ckdetect' => $sensitivity ? '1' : '0',
@@ -303,6 +310,7 @@
                     'ServerAddress' => $server,
                     'ServerPort' => $port,
                     'Timezone' => $tz,
+                    'AutoMode' => 'off',
                 ]);
             }
 
@@ -406,10 +414,6 @@
                     'nfluctuate' => '1',
                 ]);
                 sleep(60);
-            }
-
-            public function enable_public_code(bool $enabled = true) {
-                $this->set_intercom('DoorCodeActive', $enabled ? 'on' : 'off');
             }
 
             public function get_audio_levels(): array {
@@ -516,13 +520,13 @@
             }
 
             public function set_admin_password(string $password) {
-                $this->api_call('webs/umanageCfgEx', [
-                    'uflag' => 0,
-                    'uname' => $this->user,
-                    'passwd' => $password,
-                    'passwd1' => $password,
-                    'newpassword' => '',
-                ], true, "http://$this->url/umanage.asp");
+//                $this->api_call('webs/umanageCfgEx', [
+//                    'uflag' => 0,
+//                    'uname' => $this->user,
+//                    'passwd' => $password,
+//                    'passwd1' => $password,
+//                    'newpassword' => '',
+//                ], true, "http://$this->url/umanage.asp");
 
                 $this->api_call('cgi-bin/pwdgrp_cgi', [
                     'action' => 'update',
@@ -598,18 +602,22 @@
                     'LineEnable4' => 'off',
                     'LineEnable5' => 'off',
                 ]);
-                $this->set_video_overlay($text);
             }
 
-            public function set_public_code(int $code) {
-                $this->set_intercom('DoorCode', $code);
+            public function set_public_code(int $code = 0) {
+                if ($code) {
+                    $this->set_intercom('DoorCode', $code);
+                    $this->set_intercom('DoorCodeActive', 'on');
+                } else {
+                    $this->set_intercom('DoorCodeActive', 'off');
+                }
             }
 
-            public function set_relay_dtmf(int $relay_1, int $relay_2, int $relay_3) {
+            public function setDtmf(string $code1, string $code2, string $code3, string $codeOut) {
                 $this->api_call('webs/SIPExtCfgEx', [
-                    'dtmfout1' => $relay_1,
-                    'dtmfout2' => $relay_2,
-                    'dtmfout3' => $relay_3,
+                    'dtmfout1' => $code1,
+                    'dtmfout2' => $code2,
+                    'dtmfout3' => $code3,
                 ]);
             }
 
@@ -633,7 +641,7 @@
                     'DateValue' => 1,
                     'TimeValue' => 1,
                     'TimeFormat12' => 'False',
-                    'DateFormat' => 0,
+                    'DateFormat' => 2,
                     'WeekValue' => 1,
                     'BitrateValue' => 0,
                     'Color' => 0,
@@ -641,7 +649,7 @@
                 ]);
             }
 
-            public function set_web_language(string $lang) {
+            public function set_language(string $lang) {
                 switch ($lang) {
                     case 'RU':
                         $web_lang = 1;
@@ -667,6 +675,7 @@
             }
 
             public function prepare() {
+                parent::prepare();
                 $this->enable_upnp(false);
                 $this->set_alarm('SOSCallActive', 'on');
                 $this->set_intercom('AlertNoUSBDisk', 'off');
@@ -674,7 +683,5 @@
                 $this->set_intercom('IndividualLevels', 'on');
                 $this->set_intercom('SosDelay', 0);
             }
-
         }
-
     }

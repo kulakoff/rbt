@@ -16,14 +16,16 @@
 
             public static function GET($params) {
                 $households = loadBackend("households");
+                $configs = loadBackend("configs");
+                $sip = loadBackend("sip");
 
                 if (!$households) {
                     return api::ERROR();
                 } else {
                     $response = [
                         "domophones" => $households->getDomophones(),
-                        "models" => $households->getModels(),
-                        "servers" => $households->getAsteriskServers(),
+                        "models" => $configs->getDomophonesModels(),
+                        "servers" => $sip->server("all"),
                     ];
 
                     return api::ANSWER($response, "domophones");
@@ -32,7 +34,7 @@
 
             public static function index() {
                 return [
-                    "GET" => "#common",
+                    "GET" => "#same(addresses,house,GET)",
                 ];
             }
         }

@@ -6,10 +6,10 @@
 
         abstract class ds extends domophones {
 
-            public $user = 'admin';
+            public string $user = 'admin';
 
-            protected $def_pass = 'admin';
-            protected $reboot_time = 30;
+            protected string $def_pass = 'admin';
+            protected int $reboot_time = 30;
 
             /** Сделать API-вызов */
             protected function api_call($method, $params = []) {
@@ -79,7 +79,7 @@
                 ]);
             }
 
-            public function add_rfid(string $code) {
+            public function add_rfid(string $code, int $apartment = 0) {
                 // не используется
             }
 
@@ -127,11 +127,11 @@
             }
 
             public function configure_md(
-                int $sensitivity,
+                int $sensitivity = 4,
                 int $left = 0,
                 int $top = 0,
-                int $width = 0,
-                int $height = 0
+                int $width = 705,
+                int $height = 576
             ) {
                 $params = [
                     'sens' => $sensitivity ? ($sensitivity - 1) : 0,
@@ -177,6 +177,7 @@
                     'ServerAddress' => $server,
                     'ServerPort' => $port,
                     'Timezone' => $tz,
+                    'AutoMode' => 'off',
                 ]);
             }
 
@@ -274,10 +275,6 @@
                 sleep($this->reboot_time);
             }
 
-            public function enable_public_code(bool $enabled = true) {
-                // не используется
-            }
-
             public function get_audio_levels(): array {
                 $params = $this->parse_param_value($this->api_call('cgi-bin/audio_cgi', [ 'action' => 'get' ]));
 
@@ -360,21 +357,21 @@
             }
 
             public function set_display_text(string $text = '') {
-                $this->set_video_overlay($text);
-            }
-
-            public function set_public_code(int $code) {
                 // не используется
             }
 
-            public function set_relay_dtmf(int $relay_1, int $relay_2, int $relay_3) {
+            public function set_public_code(int $code = 0) {
+                // не используется
+            }
+
+            public function setDtmf(string $code1, string $code2, string $code3, string $codeOut) {
                 $this->api_call('cgi-bin/sip_cgi', [
                     'action' => 'set',
-                    'DtmfSignal1' => $relay_1,
+                    'DtmfSignal1' => $code1,
                     'DtmfBreakCall1' => 'off',
-                    'DtmfSignal2' => $relay_2,
+                    'DtmfSignal2' => $code2,
                     'DtmfBreakCall2' => 'off',
-                    'DtmfSignal3' => $relay_3,
+                    'DtmfSignal3' => $code3,
                     'DtmfBreakCall3' => 'off',
                     'DtmfSignalAll' => '',
                     'DtmfBreakCallAll' => 'off',
@@ -402,7 +399,7 @@
                     'DateValue' => 1,
                     'TimeValue' => 1,
                     'TimeFormat12' => 'False',
-                    'DateFormat' => 0,
+                    'DateFormat' => 2,
                     'WeekValue' => 1,
                     'BitrateValue' => 0,
                     'Color' => 0,
@@ -410,7 +407,7 @@
                 ]);
             }
 
-            public function set_web_language(string $lang) {
+            public function set_language(string $lang) {
                 // не используется
             }
 
@@ -427,12 +424,11 @@
             }
 
             public function prepare() {
+                parent::prepare();
                 $this->enable_bonjour(false);
                 $this->enable_upnp(false);
                 $this->configure_audio();
                 $this->configure_rtsp();
             }
-
         }
-
     }

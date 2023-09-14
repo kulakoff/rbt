@@ -7,10 +7,11 @@ CREATE TABLE houses_domophones
     server character varying not null,
     url character varying not null,
     credentials character varying not null,                                                                             -- plaintext:login:password, token:token, or something else
-    caller_id character varying not null,
     dtmf character varying not null,
-    syslog character varying,
+    first_time integer default 1,
     nat integer,
+    locks_are_open integer default 1,
+    ip text,
     comment character varying
 );
 CREATE UNIQUE INDEX domophones_ip_port on houses_domophones(url);
@@ -24,6 +25,7 @@ CREATE TABLE houses_entrances
     lat real,
     lon real,
     shared integer,
+    plog integer,
     caller_id character varying,                                                                                        -- callerId
 -- domophone's specific entrance settings
     camera_id integer,
@@ -31,8 +33,7 @@ CREATE TABLE houses_entrances
     domophone_output integer,
     cms character varying,                                                                                              -- for visualization only
     cms_type integer,
-    cms_levels character varying,
-    locks_disabled integer
+    cms_levels character varying
 );
 CREATE UNIQUE INDEX houses_entrances_uniq on houses_entrances(house_domophone_id, domophone_output);
 CREATE INDEX houses_entrances_multihouse on houses_entrances(shared);
@@ -71,15 +72,17 @@ CREATE TABLE houses_flats
     floor integer,
     flat character varying not null,
     code character varying,                                                                                             -- code for adding subscriber to flat
+    plog integer,                                                                                                       -- 0 - disabled, 1 - all, 2 - owner only, 3 - disabled by administrator
 -- domophone's specific flat settings
     manual_block integer,                                                                                               -- 1/0 manaul blocking (by abonent?)
     auto_block integer,                                                                                                 -- 1/0 auto block (by billing system?)
+    admin_block integer,                                                                                                -- 1/0 blocked by admin
     open_code character varying,                                                                                        -- door open code
-    auto_open timestamp,                                                                                                -- "YYYY-MM-DD HH:MM:SS.SSS"
+    auto_open integer,                                                                                                  -- UNIX timestamp
     white_rabbit integer,                                                                                               -- 1/0
     sip_enabled integer,                                                                                                -- 0 - disabled, 1 - classic sip, 2 - webrtc
     sip_password character varying,                                                                                     -- sip password
-    last_opened timestamp,                                                                                              -- "YYYY-MM-DD HH:MM:SS.SSS"
+    last_opened integer,                                                                                                -- UNIX timestamp
     cms_enabled integer
 );
 CREATE UNIQUE INDEX houses_flats_uniq on houses_flats(address_house_id, flat);
@@ -98,28 +101,6 @@ CREATE UNIQUE INDEX houses_entrances_flats_uniq on houses_entrances_flats (house
 CREATE INDEX houses_entrances_flats_house_entrance_id on houses_entrances_flats(house_entrance_id);
 CREATE INDEX houses_entrances_flats_house_flat_id on houses_entrances_flats(house_flat_id);
 
--- cameras <-> houses
-CREATE TABLE houses_houses_cameras
-(
-    camera_id integer not null,
-    address_house_id integer not null,
-    common integer
-);
-CREATE UNIQUE INDEX houses_houses_cameras_uniq on houses_houses_cameras(camera_id, address_house_id);
-CREATE INDEX houses_houses_cameras_camera_id on houses_houses_cameras(camera_id);
-CREATE INDEX houses_houses_cameras_house_id on houses_houses_cameras(address_house_id);
-
--- cameras <-> flats
-CREATE TABLE houses_cameras_flats
-(
-    camera_id integer not null,
-    house_flat_id integer not null,
-    common integer
-);
-CREATE UNIQUE INDEX houses_cameras_flats_uniq on houses_cameras_flats(camera_id, house_flat_id);
-CREATE INDEX houses_cameras_flats_camera_id on houses_cameras_flats(camera_id);
-CREATE INDEX houses_cameras_flats_flat_id on houses_cameras_flats(house_flat_id);
-
 -- rfid keys
 CREATE TABLE houses_rfids
 (
@@ -127,7 +108,7 @@ CREATE TABLE houses_rfids
     rfid character varying not null,
     access_type integer not null,                                                                                       -- 0 - universal, 1 - subscriber, 2 - flat, 3 - entrance, 4 - house
     access_to integer not null,                                                                                         -- 0 - universal, > 0 - subscriber_id, flat_id, ...
-    last_seen timestamp,                                                                                                -- "YYYY-MM-DD HH:MM:SS.SSS"
+    last_seen integer,                                                                                                  -- UNIX timestamp
     comments character varying
 );
 CREATE UNIQUE INDEX houses_rfids_uniq on houses_rfids(rfid, access_type, access_to);
@@ -142,8 +123,8 @@ CREATE TABLE houses_subscribers_mobile
     push_token character varying,
     push_token_type integer,                                                                                            -- 0 - fcm, 1 - apple, 2 - apple (dev), 3 - huawei
     voip_token character varying,                                                                                       -- iOs only
-    registered timestamp,                                                                                               -- "YYYY-MM-DD HH:MM:SS.SSS"
-    last_seen timestamp,                                                                                                -- "YYYY-MM-DD HH:MM:SS.SSS"
+    registered integer,                                                                                                 -- UNIX timestamp
+    last_seen integer,                                                                                                  -- UNIX timestamp
     subscriber_name character varying,
     subscriber_patronymic character varying,
     voip_enabled integer
@@ -158,6 +139,26 @@ CREATE TABLE houses_flats_subscribers
     role integer                                                                                                        -- ?
 );
 CREATE UNIQUE INDEX houses_flats_subscribers_uniq on houses_flats_subscribers(house_flat_id, house_subscriber_id);
+
+-- cameras <-> houses
+CREATE TABLE houses_cameras_houses
+(
+    camera_id integer not null,
+    address_house_id integer not null
+);
+CREATE UNIQUE INDEX houses_cameras_houses_uniq on houses_cameras_houses(camera_id, address_house_id);
+CREATE INDEX houses_cameras_houses_id on houses_cameras_houses(camera_id);
+CREATE INDEX houses_cameras_houses_house_id on houses_cameras_houses(address_house_id);
+
+-- cameras <-> flats
+CREATE TABLE houses_cameras_flats
+(
+    camera_id integer not null,
+    house_flat_id integer not null
+);
+CREATE UNIQUE INDEX houses_cameras_flats_uniq on houses_cameras_flats(camera_id, house_flat_id);
+CREATE INDEX houses_cameras_flats_camera_id on houses_cameras_flats(camera_id);
+CREATE INDEX houses_cameras_flats_flat_id on houses_cameras_flats(house_flat_id);
 
 -- cameras <-> subscribers
 CREATE TABLE houses_cameras_subscribers

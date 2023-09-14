@@ -2,7 +2,7 @@
 
     namespace tt\workflow {
 
-        abstract class workflow {
+        class workflow {
 
             /**
              * @var object $config link to config structute
@@ -10,7 +10,7 @@
              * @var object $redis link to redis object
              */
 
-            protected $config, $db, $redis;
+            protected $config, $db, $redis, $tt, $sandbox;
 
             /**
              * default constructor
@@ -20,50 +20,38 @@
              * @param object $redis link to redis object
              *
              * @return void
+             * @throws \Exception
              */
 
-            public function __construct($config, $db, $redis) {
+            public function __construct($config, $db, $redis, $tt, $workflow, $sandbox) {
                 $this->config = $config;
                 $this->db = $db;
                 $this->redis = $redis;
+                $this->tt = $tt;
+                $this->sandbox = $sandbox;
+
+                try {
+                    $code = $this->sandbox->loadString($tt->getWorkflowLibsCode() . $tt->getWorkflow($workflow));
+                    $code->call();
+                } catch (\Exception $e) {
+                    throw new \Exception("workflow not found");
+                }
             }
 
             /**
-             * @param $projectId
-             * @return boolean
+             * @param $name
+             * @param $arguments
+             * @return mixed
              */
-            abstract public function initProject($projectId);
+            public function __call($name, $arguments)
+            {
+                $ret = @$this->sandbox->callFunction($name, ...$arguments);
 
-            /**
-             * @return false|array
-             */
-            abstract public function createIssueTemplate();
-
-            /**
-             * @param $issueId
-             * @return false|array
-             */
-            abstract public function availableActions($issueId);
-
-            /**
-             * @param $issueId
-             * @param $action
-             * @return false|array
-             */
-            abstract public function actionTemplate($issueId, $action);
-
-            /**
-             * @param $issueId
-             * @param $action
-             * @param $fields
-             * @return boolean
-             */
-            abstract public function doAction($issueId, $action, $fields);
-
-            /**
-             * @param $issue
-             * @return false|string
-             */
-            abstract public function createIssue($issue);
+                if (isset($ret) && is_array($ret) && isset($ret[0])) {
+                    return $ret[0];
+                } else {
+                    return $ret;
+                }
+            }
         }
     }

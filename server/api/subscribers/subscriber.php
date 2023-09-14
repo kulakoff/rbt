@@ -20,7 +20,7 @@ namespace api\subscribers
         {
             $households = loadBackend("households");
 
-            $subscriberId = $households->addSubscriber($params["mobile"], $params["subscriberName"], $params["subscriberPatronymic"], $params["flatId"]);
+            $subscriberId = $households->addSubscriber($params["mobile"], $params["subscriberName"], $params["subscriberPatronymic"], @$params["flatId"], @$params["message"]);
 
             return api::ANSWER($subscriberId, ($subscriberId !== false)?"subscriber":false);
         }
@@ -38,7 +38,11 @@ namespace api\subscribers
         {
             $households = loadBackend("households");
 
-            $success = $households->deleteSubscriber($params["_id"]);
+            if (@$params["complete"]) {
+                $success = $households->deleteSubscriber($params["_id"]);
+            } else {
+                $success = $households->removeSubscriberFromFlat($params["_id"], $params["subscriberId"]);
+            }
 
             return api::ANSWER($success);
         }
@@ -46,10 +50,10 @@ namespace api\subscribers
         public static function index()
         {
             return [
-                "GET",
-                "POST",
-                "PUT",
-                "DELETE"
+                "GET" => "#same(addresses,house,GET)",
+                "PUT" => "#same(addresses,house,PUT)",
+                "POST" => "#same(addresses,house,POST)",
+                "DELETE" => "#same(addresses,house,DELETE)",
             ];
         }
     }

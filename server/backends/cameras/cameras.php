@@ -26,28 +26,29 @@ namespace backends\cameras
         abstract public function getCamera($cameraId);
 
         /**
-         * @return false|array
-         */
-        abstract public function getModels();
-
-        /**
          * @param $enabled
          * @param $model
          * @param $url
          * @param $stream
          * @param $credentials
-         * @param $publish
-         * @param $flussonic
+         * @param $name
+         * @param $dvrStream
+         * @param $timezone
          * @param $lat
          * @param $lon
          * @param $direction
          * @param $angle
          * @param $distance
+         * @param $frs
+         * @param $mdLeft
+         * @param $mdTop
+         * @param $mdWidth
+         * @param $mdHeight
          * @param $common
          * @param $comment
          * @return false|integer
          */
-        abstract public function addCamera($enabled, $model, $url, $stream, $credentials, $publish, $flussonic, $lat, $lon, $direction, $angle, $distance, $common, $comment);
+        abstract public function addCamera($enabled, $model, $url, $stream, $credentials, $name, $dvrStream, $timezone, $lat, $lon, $direction, $angle, $distance, $frs, $mdLeft, $mdTop, $mdWidth, $mdHeight, $common, $comment);
 
         /**
          * @param $cameraId
@@ -56,18 +57,24 @@ namespace backends\cameras
          * @param $url
          * @param $stream
          * @param $credentials
-         * @param $publish
-         * @param $flussonic
+         * @param $name
+         * @param $dvrStream
+         * @param $timezone
          * @param $lat
          * @param $lon
          * @param $direction
          * @param $angle
          * @param $distance
+         * @param $frs
+         * @param $mdLeft
+         * @param $mdTop
+         * @param $mdWidth
+         * @param $mdHeight
          * @param $common
          * @param $comment
          * @return boolean
          */
-        abstract public function modifyCamera($cameraId, $enabled, $model, $url, $stream, $credentials, $publish, $flussonic, $lat, $lon, $direction, $angle, $distance, $common, $comment);
+        abstract public function modifyCamera($cameraId, $enabled, $model, $url, $stream, $credentials, $name, $dvrStream, $timezone, $lat, $lon, $direction, $angle, $distance, $frs, $mdLeft, $mdTop, $mdWidth, $mdHeight, $common, $comment);
 
         /**
          * @param $cameraId

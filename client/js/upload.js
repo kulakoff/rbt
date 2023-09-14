@@ -1,129 +1,118 @@
-// modalUpload([ "image/jpeg", "image/png", "application/pdf" ], 2 * 1024 * 1024, '/server/');
+const mime2fa = {
+    false: "far fa-fw fa-file",
+    ".jpg": "far fa-fw fa-file-image",
+    ".png": "far fa-fw fa-file-image",
+    ".tiff": "far fa-fw fa-file-image",
+    ".pdf": "far fa-fw fa-file-pdf",
+    ".mp4": "far fa-fw fa-file-video",
+    ".odt": "far fa-fw fa-file-word",
+    ".doc": "far fa-fw fa-file-word",
+    ".docx": "far fa-fw fa-file-word",
+    ".ods": "far fa-fw fa-file-excel",
+    ".xlsx": "far fa-fw fa-file-excel",
+    ".xls": "far fa-fw fa-file-excel",
+};
 
-function modalUpload(mimeTypes, maxSize, url, postFields, callback) {
-    let h = `
-        <div class="card mt-0 mb-0">
-            <div class="card-header">
-                <h3 class="card-title">${i18n("upload")}</h3>
-                <button type="button" class="btn btn-danger btn-xs btn-tool-rbt-right ml-2 float-right uploadModalFormCancel" data-dismiss="modal" title="${i18n("cancel")}"><i class="far fa-fw fa-times-circle"></i></button>
-            </div>
-            <div class="card-body table-responsive p-0">
-                <table class="table tform-borderless">
-                    <tbody>
-                        <tr style="display: none">
-                            <td colspan="2" id="uploadFileInfo">&nbsp;</td>
-                        </tr>
-                        <tr>
-                            <td class="tdform">${i18n("chooseFile")}</td>
-                            <td class="tdform-right">
-                                <input type="file" id="fileInput" style="display: none" accept="${mimeTypes?mimeTypes.join(","):""}"/>
-                                <div class="input-group">
-                                    <input id="fakeFileInput" type="text" class="form-control modalFormField" autocomplete="off" placeholder="${i18n("chooseFile")}" readonly="readonly">
-                                    <div class="input-group-append">
-                                        <span id="fakeFileInputButton" class="input-group-text pointer"><i class="fas fa-fw fa-folder-open"></i></span>
-                                    </div>
-                                </div>
-                            </td>
-                        </tr>
-                    </tbody>
-                    <tfoot>
-                        <tr>
-                            <td colspan="2"><button id="uploadButton" class="btn btn-default">${i18n("doUpload")}</button></td>
-                        </tr>
-                    </tfoot>
-                </table>
-            </div>
-        </div>
-    `;
+function uploadForm(mimeTypes) {
+    mimeTypes = mimeTypes?escapeHTML(mimeTypes.join(",")):"";
 
-    $("#modalUploadBody").html(h);
+    $("#uploadModalTitle").text(i18n("upload"));
+    $("#uploadModalCancel").attr("title", i18n("cancel"));
+    $("#chooseFileToUpload").text(i18n("chooseFile"));
+    $("#uploadButton").text(i18n("doUpload"));
+}    
 
-    function progress(p) {
-        loadingProgress.set(p);
-    }
+function loadFile(mimeTypes, maxSize, callback) {
+    uploadForm(mimeTypes);
 
-    $("#fakeFileInputButton").off("click").on("click", () => {
-        $("#fakeFileInput").val("");
-        $("#uploadFileInfo").parent().hide();
-        $("#uploadFileProgress").hide();
-        progress(0);
+    let files = [];
+    let file = false;
+
+    $("#chooseFileToUpload").off("click").on("click", () => {
+        $("#fileIcon").html(`<h1><i class="far fa-folder-open"></i></h1>`);
+        $("#fileIcon").attr("title", i18n("fileNotUploaded"));
+        $("#uploadFileInfo").html(`
+            ${i18n("fileNotUploaded")}<br />
+            ${i18n("fileSize")}:<br />
+            ${i18n("fileDate")}:<br />
+            ${i18n("fileType")}:<br />
+        `).parent().show();
+        $("#uploadButton").hide();
         $("#fileInput").off("change").val("").click().on("change", () => {
-            let files = document.querySelector("#fileInput").files;
-            if (files && files.length && files[0].name) {
-                $("#fakeFileInput").val(files[0].name);
+            files = document.querySelector("#fileInput").files;
+
+            if (files.length === 0) {
+                error(i18n("noFileSelected"));
+                return;
+            }
+
+            if (files.length > 1) {
+                error(i18n("multiuploadNotSupported"));
+                return;
+            }
+
+            file = files[0];
+
+            if (mimeTypes && mimeTypes.indexOf(file.type) === -1) {
+                error("incorrectFileType");
+                return;
+            }
+
+            if (maxSize && file.size > maxSize) {
+                error("exceededSize");
+                return;
+            }
+
+            if (file) {
+                let icon;
+                if (mime2fa[file.type]) {
+                    icon = mime2fa[file.type];
+                } else {
+                    icon = mime2fa[false];
+                }
+                $("#fileIcon").html(`<h1><i class="${icon}"></i></h1>`);
+                $("#fileIcon").attr("title", file.name);
                 $("#uploadFileInfo").html(`
-                    ${i18n("fileName")}: ${files[0].name}<br />
-                    ${i18n("fileSize")}: ${formatBytes(files[0].size)}<br />
-                    ${i18n("fileDate")}: ${date("Y-m-d H:i", files[0].lastModified / 1000)}<br />
-                    ${i18n("fileType")}: ${files[0].type}<br />
+                    ${file.name}<br />
+                    ${i18n("fileSize")}: ${formatBytes(file.size)}<br />
+                    ${i18n("fileDate")}: ${date("Y-m-d H:i", file.lastModified / 1000)}<br />
+                    ${i18n("fileType")}: ${file.type}<br />
                 `).parent().show();
-                console.log(document.querySelector("#fileInput").files);
+                $("#uploadButton").show();
             }
         });
     });
 
     $("#uploadButton").off("click").on("click", () => {
-        if (document.querySelector('#fileInput').files.length === 0) {
-            error(i18n("noFileSelected"));
-            return;
+        if (file) {
+            $('#uploadModal').modal('hide');
+
+            fetch(URL.createObjectURL(file)).then(response => {
+                return response.blob();
+            }).then(blob => {
+                setTimeout(() => {
+                    let reader = new FileReader();
+                    reader.onloadend = () => {
+                        let body = reader.result.split(';base64,')[1];
+                        if (typeof callback === "function") {
+                            callback({
+                                name: file.name,
+                                size: file.size,
+                                date: file.lastModified,
+                                type: file.type,
+                                body: body,
+                            });
+                        }
+                    };
+                    reader.readAsDataURL(blob);
+                }, 100);
+            });
         }
-
-        if (document.querySelector('#fileInput').files.length > 1) {
-            error(i18n("multiuploadNotSupported"));
-            return;
-        }
-
-        let file = document.querySelector('#fileInput').files[0];
-
-        if (mimeTypes && mimeTypes.indexOf(file.type) === -1) {
-            error("incorrectFileType");
-            return;
-        }
-
-        if (maxSize && file.size > maxSize) {
-            error("exceededSize");
-            return;
-        }
-
-        $('#modalUpload').modal('hide');
-
-        autoZ($('#progress').modal({
-            backdrop: 'static',
-            keyboard: false,
-        }));
-
-        let data = new FormData();
-
-        data.append('file', file);
-
-        for (let i in postFields) {
-            data.append(i, postFields[i]);
-        }
-
-        data.append("_token", $.cookie("_token"));
-
-        let request = new XMLHttpRequest();
-        request.open('POST', url);
-
-        request.upload.addEventListener('progress', function(e) {
-            progress(Math.floor((e.loaded / e.total)*100));
-        });
-
-        request.addEventListener("loadend", response => {
-            $('#progress').modal('hide');
-            if (request.status !== 200) {
-                error(request.statusText, request.status);
-            } else {
-                if (typeof callback === "function") {
-                    callback(response);
-                }
-            }
-        });
-
-        request.send(data);
     });
 
-    autoZ($('#modalUpload')).modal('show');
+    autoZ($('#uploadModal')).modal('show');
 
     xblur();
+
+    $("#chooseFileToUpload").click();
 }

@@ -1,13 +1,14 @@
 -- regions
 CREATE TABLE addresses_regions
 (
-    address_region_id integer not null primary key autoincrement,
+    address_region_id integer primary key autoincrement,
     region_uuid text,
     region_iso_code text,
     region_with_type text not null,
     region_type text,
     region_type_full text,
-    region text not null
+    region text not null,
+    timezone text
 );
 CREATE UNIQUE INDEX addresses_regions_region_uuid on addresses_regions(region_uuid);
 CREATE UNIQUE INDEX addresses_regions_region on addresses_regions(region);
@@ -15,13 +16,14 @@ CREATE UNIQUE INDEX addresses_regions_region on addresses_regions(region);
 -- areas
 CREATE TABLE addresses_areas
 (
-    address_area_id integer not null primary key autoincrement,
+    address_area_id integer primary key autoincrement,
     address_region_id integer not null,
     area_uuid text,
     area_with_type text not null,
     area_type text,
     area_type_full text,
-    area text not null
+    area text not null,
+    timezone text
 );
 CREATE UNIQUE INDEX addresses_areas_area_uuid on addresses_areas(area_uuid);
 CREATE UNIQUE INDEX addresses_areas_area on addresses_areas(address_region_id, area);
@@ -30,14 +32,15 @@ CREATE INDEX addresses_areas_address_region_id on addresses_areas(address_region
 -- cities
 CREATE TABLE addresses_cities
 (
-    address_city_id integer not null primary key autoincrement,
+    address_city_id integer primary key autoincrement,
     address_region_id integer,
     address_area_id integer,
     city_uuid text,
     city_with_type text not null,
     city_type text,
     city_type_full text,
-    city text not null
+    city text not null,
+    timezone text
 );
 CREATE UNIQUE INDEX addresses_cities_city_uuid on addresses_cities(city_uuid);
 CREATE UNIQUE INDEX addresses_cities_city on addresses_cities(address_region_id, address_area_id, city);
@@ -47,7 +50,7 @@ CREATE INDEX addresses_cities_address_area_id on addresses_cities(address_area_i
 -- settlements
 CREATE TABLE addresses_settlements
 (
-    address_settlement_id integer not null primary key autoincrement,
+    address_settlement_id integer primary key autoincrement,
     address_area_id integer,
     address_city_id integer,
     settlement_uuid text,
@@ -64,7 +67,7 @@ CREATE INDEX addresses_settlements_address_area_id on addresses_settlements(addr
 -- streets
 CREATE TABLE addresses_streets
 (
-    address_street_id integer not null primary key autoincrement,
+    address_street_id integer primary key autoincrement,
     address_city_id integer,
     address_settlement_id integer,
     street_uuid text,
@@ -81,7 +84,7 @@ CREATE INDEX addresses_streets_address_address_city_id on addresses_streets(addr
 -- houses
 CREATE TABLE addresses_houses
 (
-    address_house_id integer not null primary key autoincrement,
+    address_house_id integer primary key autoincrement,
     address_settlement_id integer,
     address_street_id integer,
     house_uuid text,

@@ -1,0 +1,17 @@
+{
+    "dvr": {
+        "videoReady": "Видео готово к загрузке",
+        "threeDays": "%s/cctv/download/%s\nВнимание! Файлы на сервере будут доступны в течение 3 суток"
+    },
+
+    "sip": {
+        "incomingTitle": "Входящий вызов",
+        "callFailedTitle": "Пропущенный вызов"
+    },
+
+    "monitoring": {
+        "unknown": "Статус неизвестен"
+    },
+
+    "cantLoadBackend": "Ошибка загрузки модуля %s"
+}

@@ -161,7 +161,7 @@
             }
 
             public static function PUT($params) {
-                $success = loadBackend("groups")->modifyGroup($params["_id"], $params["acronym"], $params["name"]);
+                $success = loadBackend("groups")->modifyGroup($params["_id"], $params["acronym"], $params["name"], $params["admin"]);
 
                 return api::ANSWER($success, ($success !== false)?false:"notAcceptable");
             }
@@ -176,10 +176,17 @@
                 $groups = loadBackend("groups");
 
                 if ($groups && $groups->capabilities()["mode"] === "rw") {
-                    return [ "GET", "POST", "PUT", "DELETE" ];
+                    return [
+                        "GET",
+                        "POST",
+                        "PUT",
+                        "DELETE"
+                    ];
                 }
                 if ($groups) {
-                    return [ "GET" ];
+                    return [
+                        "GET"
+                    ];
                 } else {
                     return [ ];
                 }

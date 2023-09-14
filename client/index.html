@@ -5,18 +5,23 @@
     <title>::</title>
 
     <link id="favicon" rel="shortcut icon" href="img/smartIcon.png"/>
-    <!-- Google Font: Source Sans Pro -->
+    <!-- Google Font: Source Sans Pro
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,400i,700&display=fallback">
+     -->
     <!-- Font Awesome Icons -->
     <link rel="stylesheet" href="lib/AdminLTE/plugins/fontawesome-free/css/all.min.css">
     <!-- Toastr -->
     <link rel="stylesheet" href="lib/AdminLTE/plugins/toastr/toastr.min.css">
+    <!-- Leaflet -->
+    <link rel="stylesheet" href="lib/Leaflet/dist/leaflet.css">
     <!-- jQuery -->
     <script src="lib/AdminLTE/plugins/jquery/jquery.min.js"></script>
     <!-- jQuery -->
     <script src="lib/AdminLTE/plugins/jquery-ui/jquery-ui.min.js"></script>
     <!-- cookie for jQuery -->
     <script src="js/cookie.js"></script>
+    <!-- DOMPurify -->
+    <script src="js/purify.min.js"></script>
     <!-- icheck bootstrap -->
     <link rel="stylesheet" href="lib/AdminLTE/plugins/icheck-bootstrap/icheck-bootstrap.min.css">
     <!-- select2 -->
@@ -28,36 +33,58 @@
     <link rel="stylesheet" href="lib/loading-bar/dist/loading-bar.min.css">
     <!-- Theme style -->
     <link rel="stylesheet" href="lib/AdminLTE/dist/css/adminlte.min.css">
+    <!-- select2totree style -->
+    <link rel="stylesheet" href="css/select2totree.css">
     <!-- app css -->
     <link rel="stylesheet" href="css/index.css">
+    <!-- yaml support -->
+    <script src="js/js-yaml.min.js"></script>
+    <!-- leaflet -->
+    <script src="lib/Leaflet/dist/leaflet.js"></script>
+    <!-- Clipboard -->
+    <script src="js/clipboard.min.js"></script>
 
     <!-- wait for fully load -->
     <script type="application/javascript">
-        document.addEventListener("DOMContentLoaded", () => {
-            $.get("config/config.json", c => {
-                config = c;
-                let l = $.cookie("_lang");
+        function cfg(c) {
+            config = c;
+            lStore(() => {
+                let l = lStore("_lang");
                 if (!l) {
                     l = config.defaultLanguage;
                 }
                 if (!l) {
                     l = "ru";
                 }
-                $.get("i18n/" + l + ".json", t => {
+                $.get("i18n/" + l + ".json").
+                done(t => {
                     lang = t;
                     initAll();
-                }).fail(function() {
+                }).
+                fail(function() {
                     lang = {};
                     initAll();
                 });
-            }).fail(() => {
-                error("Woops can't get config");
+            });
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            $.get("config/config.json").
+            done(cfg).
+            fail(() => {
+                $.get("config/config.yml").
+                done(y => {
+                    cfg(jsyaml.load(y));
+                }).
+                fail(() => {
+                    error("Woops can't get config");
+                });
             });
         });
     </script>
 </head>
 
-<body class="hold-transition sidebar-mini">
+<body class="hold-transition sidebar-mini sidebar-collapse">
 
     <div id="loading" class="centre-of-all" data-keyboard="false" data-backdrop="static" style="z-index: 1000; position: fixed !important; top: 50% !important; left: 50% !important; padding: 15px !important; transform: translate(-50%, -50%) !important;">
         <!--
@@ -92,20 +119,22 @@
             <ul class="navbar-nav ml-auto" id="topMenuRight">
 
                 <!-- Search form -->
-                <div class="form-inline mr-3" id="searchForm" style="display: none;">
-                    <div class="input-group input-group-sm">
-                        <input id="searchInput" class="form-control" type="search" aria-label="Search">
-                        <div class="input-group-append">
-                            <button class="btn btn-default" id="searchButton">
-                                <i class="fas fa-search"></i>
-                            </button>
+                <form autocomplete="off">
+                    <div class="form-inline mr-3" id="searchForm" style="display: none; padding-top: 4px;">
+                        <div class="input-group input-group-sm">
+                            <input id="searchInput" class="form-control" type="search" aria-label="Search">
+                            <div class="input-group-append">
+                                <button class="btn btn-default" id="searchButton">
+                                    <i class="fas fa-search"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-
+                </form>
+                
                 <div id="rightTopDynamic"></div>
 
-                <li class="nav-item">
+                <li class="nav-item rs232-scanner-button" style="display: none;">
                     <span class="nav-link" style="padding-top: 4px;"><span class="bg-dark p-1 rounded rs232-scanner text-bold text-monospace pointer" style="font-size: 70%;">Z2</span></span>
                 </li>
 
@@ -173,7 +202,6 @@
                 </div>
             </div>
         </div>
-
     </div>
 
     <!-- confirmModal -->
@@ -226,17 +254,42 @@
     </div>
 
     <!-- modal -->
-    <div class="modal p-0" id="modal" role="dialog" style="padding-top: 4rem!important;">
+    <div class="modal p-0" id="modal" role="dialog" style="padding-top: 4rem!important;; display: none;">
         <div class="modal-dialog p-0" role="document">
             <div class="modal-content p-0" id="modalBody">
             </div>
         </div>
     </div>
 
-    <!-- modalUpload -->
-    <div class="modal p-0" id="modalUpload" role="dialog" style="padding-top: 4rem!important;">
-        <div class="modal-dialog p-0" role="document">
-            <div class="modal-content p-0" id="modalUploadBody">
+    <!-- uploadModal -->
+    <div class="modal p-0" id="uploadModal" role="dialog" style="padding-top: 4rem!important;; display: none;">
+        <div class="modal-dialog modal-lg p-0" role="document">
+            <div class="modal-content p-0" id="uploadModalBody">
+                <div class="card mt-0 mb-0">
+                    <div class="card-header" id="uploadModalHeader">
+                        <h3 class="card-title" id="uploadModalTitle">...</h3>
+                        <button type="button" class="btn btn-danger btn-xs btn-tool-rbt-right ml-2 float-right uploadModalFormCancel" data-dismiss="modal" id="uploadModalCancel"><i class="far fa-fw fa-times-circle"></i></button>
+                    </div>
+                    <div class="card-body table-responsive p-0">
+                        <input type="file" id="fileInput" style="display: none" accept="${mimeTypes}"/>
+                        <table class="table tform-borderless mt-2 mb-3" style="width: 100%;">
+                            <tbody>
+                                <tr style="display: none">
+                                    <td id="fileIcon">&nbsp;</td>
+                                    <td id="uploadFileInfo" style="text-align: left; width: 100%;">&nbsp;</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <table class="table tform-borderless">
+                            <tfoot>
+                                <tr>
+                                    <td><button id="chooseFileToUpload" class="btn btn-default">...</button></td>
+                                    <td style="text-align: right"><button id="uploadButton" class="btn btn-default">...</button></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -277,17 +330,11 @@
                         </select>
                     </div>
                     <div class="row">
-                        <div class="col-8">
-                            <div class="icheck-primary">
-                                <input type="checkbox" id="loginBoxRemember">
-                                <label for="loginBoxRemember" id="loginBoxRememberLabel"></label>
-                            </div>
-                        </div>
                         <div class="col-4">
                             <button type="button" class="btn btn-primary btn-block" onclick="login()" id="loginBoxLoginButton"></button>
                         </div>
                     </div>
-                    <p id="loginBoxForgot" class="mb-1 mt-3" style="display: none;">
+                    <p id="loginBoxForgot" class="mb-1 mt-2" style="display: none;">
                         <a href="javascript:void(0)" onclick="showForgotPasswordForm()" id="loginBoxForgotPassword"></a>
                     </p>
                 </div>
@@ -333,8 +380,6 @@
 
     <!-- REQUIRED SCRIPTS -->
 
-    <!-- misc. utils -->
-    <script src="js/utils.js"></script>
     <!-- Bootstrap 4 -->
     <script src="lib/AdminLTE/plugins/bootstrap/js/bootstrap.bundle.min.js"></script>
     <!-- SweetAlert2 -->
@@ -361,8 +406,6 @@
     <script src="lib/loading-bar/dist/loading-bar.min.js"></script>
     <!-- PWGen -->
     <script src="js/pwgen.js"></script>
-    <!-- API -->
-    <script src="js/api.js"></script>
     <!-- Table creation -->
     <script src="js/table.js"></script>
     <!-- Form creation -->
@@ -372,11 +415,17 @@
     <!-- rfId scanner support -->
     <script src="js/rs232.js"></script>
     <!-- webRTC support -->
-    <script src="js/jssip-3.9.1.min.js"></script>
+    <script src="js/jssip.min.js"></script>
     <!-- beep -->
     <script src="js/beep.js"></script>
     <!-- ACE-Editor -->
     <script src="lib/ace-builds/src-noconflict/ace.js"></script>
+    <!-- select2totree -->
+    <script src="js/select2totree.js"></script>
+    <!-- MQTT client -->
+    <script src="js/mqtt.min.js"></script>
+    <!-- KV store -->
+    <script src="js/idbkvstore.min.js"></script>
     <!-- APP -->
     <script src="js/app.js"></script>
 

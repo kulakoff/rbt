@@ -1,6 +1,8 @@
 ({
     init: function () {
-        leftSide("fas fa-fw fa-video", i18n("addresses.cameras"), "#addresses.cameras");
+        if (AVAIL("addresses", "region", "PUT")) {
+            leftSide("fas fa-fw fa-video", i18n("addresses.cameras"), "?#addresses.cameras", "households");
+        }
         moduleLoaded("addresses.cameras", this);
     },
 
@@ -33,7 +35,9 @@
         done(() => {
             message(i18n("addresses.cameraWasDeleted"))
         }).
-        always(modules.addresses.cameras.route);
+        always(() => {
+            modules.addresses.cameras.route();
+        });
     },
 
     addCamera: function () {
@@ -48,6 +52,20 @@
                 id,
                 text: modules.addresses.cameras.meta.models[id].title,
             })
+        }
+
+        frss = [];
+
+        frss.push({
+            value: "-",
+            text: i18n('no'),
+        });
+
+        for (let i in modules.addresses.cameras.meta.frsServers) {
+            frss.push({
+                value: modules.addresses.cameras.meta.frsServers[i].url,
+                text: modules.addresses.cameras.meta.frsServers[i].title,
+            });
         }
 
         cardForm({
@@ -113,27 +131,18 @@
                     }
                 },
                 {
-                    id: "publish",
+                    id: "name",
                     type: "text",
-                    title: i18n("addresses.publish"),
-                    placeholder: "rtmp://",
+                    title: i18n("addresses.cameraName"),
+                    placeholder: i18n("addresses.cameraName"),
                     validate: v => {
-                        if (v) {
-                            try {
-                                new URL(v);
-                                return true;
-                            } catch (_) {
-                                return false;
-                            }
-                        } else {
-                            return true;
-                        }
+                        return $.trim(v) !== "";
                     },
                 },
                 {
-                    id: "flussonic",
+                    id: "dvrStream",
                     type: "text",
-                    title: i18n("addresses.flussonic"),
+                    title: i18n("addresses.dvrStream"),
                     placeholder: "https://",
                     validate: v => {
                         if (v) {
@@ -149,34 +158,61 @@
                     },
                 },
                 {
-                    id: "lat",
-                    type: "text",
-                    title: i18n("addresses.lat"),
-                    placeholder: i18n("addresses.lon"),
+                    id: "timezone",
+                    type: "select2",
+                    title: i18n("addresses.timezone"),
+                    placeholder: i18n("addresses.timezone"),
+                    options: modules.addresses.timezonesOptions(),
+                    validate: (v) => {
+                        return $.trim(v) !== "";
+                    },
+                    value: "-",
                 },
                 {
-                    id: "lon",
-                    type: "text",
-                    title: i18n("addresses.lon"),
-                    placeholder: i18n("addresses.lon"),
+                    id: "frs",
+                    type: "select2",
+                    title: i18n("addresses.frs"),
+                    value: "-",
+                    options: frss,
                 },
                 {
-                    id: "direction",
+                    id: "geo",
                     type: "text",
-                    title: i18n("addresses.direction"),
-                    placeholder: i18n("addresses.direction"),
+                    title: i18n("addresses.geo"),
+                    placeholder: "0.0,0.0",
+                    hint: i18n("addresses.lat") + "," + i18n("addresses.lon").toLowerCase(),
+                    value: "0.0,0.0",
+                    validate: v => {
+                        const regex = new RegExp('^[+-]?((\\d+\\.?\\d*)|(\\.\\d+)),[+-]?((\\d+\\.?\\d*)|(\\.\\d+))$', 'gm');
+
+                        return regex.exec(v) !== null;
+                    },
                 },
                 {
-                    id: "angle",
+                    id: "position",
                     type: "text",
-                    title: i18n("addresses.angle"),
-                    placeholder: i18n("addresses.angle"),
+                    title: i18n("addresses.position"),
+                    placeholder: "0,0,0",
+                    hint: i18n("addresses.direction") + "," + i18n("addresses.angle").toLowerCase() + "," + i18n("addresses.distance").toLowerCase(),
+                    value: "0,0,0",
+                    validate: v => {
+                        const regex = new RegExp('^\\d+,\\d+,\\d+$', 'gm');
+
+                        return regex.exec(v) !== null;
+                    },
                 },
                 {
-                    id: "distance",
+                    id: "md",
                     type: "text",
-                    title: i18n("addresses.distance"),
-                    placeholder: i18n("addresses.distance"),
+                    title: i18n("addresses.md"),
+                    hint: i18n("addresses.left") + "," + i18n("addresses.right").toLowerCase() + "," + i18n("addresses.width").toLowerCase() + "," + i18n("addresses.height").toLowerCase(),
+                    placeholder: "0,0,0,0",
+                    value: "0,0,0,0",
+                    validate: v => {
+                        const regex = new RegExp('^\\d+,\\d+,\\d+,\\d+$', 'gm');
+
+                        return regex.exec(v) !== null;
+                    },
                 },
                 {
                     id: "common",
@@ -194,7 +230,21 @@
                     },
                 },
             ],
-            callback: modules.addresses.cameras.doAddCamera,
+            callback: result => {
+                let g = result.geo.split(",");
+                result.lat = $.trim(g[0]);
+                result.lon = $.trim(g[1]);
+                let p = result.position.split(",")
+                result.direction = $.trim(p[0]);
+                result.angle = $.trim(p[1]);
+                result.distance = $.trim(p[2]);
+                let m = result.md.split(",");
+                result.mdLeft = $.trim(m[0]);
+                result.mdTop = $.trim(m[1]);
+                result.mdWidth = $.trim(m[2]);
+                result.mdHeight = $.trim(m[3]);
+                modules.addresses.cameras.doAddCamera(result);
+            },
         });
     },
 
@@ -219,6 +269,20 @@
                 camera = modules.addresses.cameras.meta.cameras[i];
                 break;
             }
+        }
+
+        frss = [];
+
+        frss.push({
+            value: "-",
+            text: i18n('no'),
+        });
+
+        for (let i in modules.addresses.cameras.meta.frsServers) {
+            frss.push({
+                value: modules.addresses.cameras.meta.frsServers[i].url,
+                text: modules.addresses.cameras.meta.frsServers[i].title,
+            });
         }
 
         if (camera) {
@@ -297,30 +361,21 @@
                         }
                     },
                     {
-                        id: "publish",
+                        id: "name",
                         type: "text",
-                        title: i18n("addresses.publish"),
-                        placeholder: "rtmp://",
-                        value: camera.publish,
+                        title: i18n("addresses.cameraName"),
+                        placeholder: i18n("addresses.cameraName"),
+                        value: camera.name,
                         validate: v => {
-                            if (v) {
-                                try {
-                                    new URL(v);
-                                    return true;
-                                } catch (_) {
-                                    return false;
-                                }
-                            } else {
-                                return true;
-                            }
+                            return $.trim(v) !== "";
                         },
                     },
                     {
-                        id: "flussonic",
+                        id: "dvrStream",
                         type: "text",
-                        title: i18n("addresses.flussonic"),
+                        title: i18n("addresses.dvrStream"),
                         placeholder: "https://",
-                        value: camera.flussonic,
+                        value: camera.dvrStream,
                         validate: v => {
                             if (v) {
                                 try {
@@ -335,39 +390,61 @@
                         },
                     },
                     {
-                        id: "lat",
-                        type: "text",
-                        title: i18n("addresses.lat"),
-                        placeholder: i18n("addresses.lon"),
-                        value: camera.lat,
+                        id: "timezone",
+                        type: "select2",
+                        title: i18n("addresses.timezone"),
+                        placeholder: i18n("addresses.timezone"),
+                        options: modules.addresses.timezonesOptions(),
+                        validate: (v) => {
+                            return $.trim(v) !== "";
+                        },
+                        value: camera.timezone,
                     },
                     {
-                        id: "lon",
-                        type: "text",
-                        title: i18n("addresses.lon"),
-                        placeholder: i18n("addresses.lon"),
-                        value: camera.lon,
+                        id: "frs",
+                        type: "select2",
+                        title: i18n("addresses.frs"),
+                        value: camera.frs,
+                        options: frss,
                     },
                     {
-                        id: "direction",
+                        id: "geo",
                         type: "text",
-                        title: i18n("addresses.direction"),
-                        placeholder: i18n("addresses.direction"),
-                        value: camera.direction,
+                        title: i18n("addresses.geo"),
+                        placeholder: "0.0,0.0",
+                        hint: i18n("addresses.lat") + "," + i18n("addresses.lon").toLowerCase(),
+                        value: camera.lat + "," + camera.lon,
+                        validate: v => {
+                            const regex = new RegExp('^[+-]?((\\d+\\.?\\d*)|(\\.\\d+)),[+-]?((\\d+\\.?\\d*)|(\\.\\d+))$', 'gm');
+
+                            return regex.exec(v) !== null;
+                        },
                     },
                     {
-                        id: "angle",
+                        id: "position",
                         type: "text",
-                        title: i18n("addresses.angle"),
-                        placeholder: i18n("addresses.angle"),
-                        value: camera.angle,
+                        title: i18n("addresses.position"),
+                        placeholder: "0,0.0",
+                        value: camera.direction + "," + camera.angle + "," + camera.distance,
+                        hint: i18n("addresses.direction") + "," + i18n("addresses.angle").toLowerCase() + "," + i18n("addresses.distance").toLowerCase(),
+                        validate: v => {
+                            const regex = new RegExp('^\\d+,\\d+,\\d+$', 'gm');
+
+                            return regex.exec(v) !== null;
+                        },
                     },
                     {
-                        id: "distance",
+                        id: "md",
                         type: "text",
-                        title: i18n("addresses.distance"),
-                        placeholder: i18n("addresses.distance"),
-                        value: camera.distance,
+                        title: i18n("addresses.md"),
+                        placeholder: "0,0,0,0",
+                        hint: i18n("addresses.left") + "," + i18n("addresses.right").toLowerCase() + "," + i18n("addresses.width").toLowerCase() + "," + i18n("addresses.height").toLowerCase(),
+                        value: camera.mdLeft + "," + camera.mdTop + "," + camera.mdWidth + "," + camera.mdHeight,
+                        validate: v => {
+                            const regex = new RegExp('^\\d+,\\d+,\\d+,\\d+$', 'gm');
+
+                            return regex.exec(v) !== null;
+                        },
                     },
                     {
                         id: "common",
@@ -388,6 +465,18 @@
                     },
                 ],
                 callback: result => {
+                    let g = result.geo.split(",");
+                    result.lat = $.trim(g[0]);
+                    result.lon = $.trim(g[1]);
+                    let p = result.position.split(",")
+                    result.direction = $.trim(p[0]);
+                    result.angle = $.trim(p[1]);
+                    result.distance = $.trim(p[2]);
+                    let m = result.md.split(",");
+                    result.mdLeft = $.trim(m[0]);
+                    result.mdTop = $.trim(m[1]);
+                    result.mdWidth = $.trim(m[2]);
+                    result.mdHeight = $.trim(m[3]);
                     if (result.delete === "yes") {
                         modules.addresses.cameras.deleteCamera(cameraId);
                     } else {
@@ -435,6 +524,9 @@
                         title: i18n("addresses.url"),
                     },
                     {
+                        title: i18n("addresses.cameraName"),
+                    },
+                    {
                         title: i18n("addresses.comment"),
                         fullWidth: true,
                     },
@@ -453,6 +545,10 @@
                                 },
                                 {
                                     data: modules.addresses.cameras.meta.cameras[i].url,
+                                    nowrap: true,
+                                },
+                                {
+                                    data: modules.addresses.cameras.meta.cameras[i].name,
                                     nowrap: true,
                                 },
                                 {

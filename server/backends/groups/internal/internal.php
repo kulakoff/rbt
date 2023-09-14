@@ -19,16 +19,24 @@
              */
 
             public function getGroups($uid = false) {
+                $key = $uid?"GROUPSBY:$uid":"GROUPS";
+
+                $cache = $this->cacheGet($key);
+                if ($cache) {
+                    return $cache;
+                }
+                
                 if ($uid === false) {
-                    $groups = $this->db->query("select gid, name, acronym, (select count (*) from core_users_groups as g1 where g1.gid = core_groups.gid) users from core_groups order by gid", \PDO::FETCH_ASSOC)->fetchAll();
+                    $_groups = $this->db->queryEx("select gid, name, acronym, (select count(*) from (select uid from (select uid from core_users_groups g1 where g1.gid=g2.gid union select admin from core_groups g3 where g3.gid=g2.gid and admin is not null union select uid from core_users u1 where u1.primary_group=g2.gid) as t2 group by uid) as t3) as users, admin, login as \"adminLogin\" from core_groups as g2 left join core_users on g2.admin = core_users.uid order by name, acronym, gid");
                 } else {
                     if (!checkInt($uid)) {
                         return false;
                     }
-                    $groups = $this->db->query("select gid, name, acronym, (select count (*) from core_users_groups as g1 where g1.gid = core_groups.gid) users from core_groups where gid in (select gid from core_users_groups where uid = $uid) order by gid", \PDO::FETCH_ASSOC)->fetchAll();
+                    $_groups = $this->db->queryEx("select gid, name, acronym, (select count(*) from (select uid from (select uid from core_users_groups g1 where g1.gid=g2.gid union select admin from core_groups g3 where g3.gid=g2.gid and admin is not null union select uid from core_users u1 where u1.primary_group=g2.gid) as t2 group by uid) as t3) as users, admin, login as \"adminLogin\" from core_groups as g2 left join core_users on g2.admin = core_users.uid where gid in (select gid from core_users_groups where uid = $uid) or gid in (select primary_group from core_users where uid = $uid) or admin = $uid order by name, acronym, gid");
                 }
 
-                return $groups;
+                $this->cacheSet($key, $_groups);
+                return $_groups;
             }
 
             /**
@@ -40,15 +48,24 @@
              */
 
             public function getGroup($gid) {
+                $key = "GROUP:$gid";
+
+                $cache = $this->cacheGet($key);
+                if ($cache) {
+                    return $cache;
+                }
+                
                 if (!checkInt($gid)) {
                     return false;
                 }
 
-                $groups = $this->db->query("select gid, name, acronym from core_groups where gid = $gid", \PDO::FETCH_ASSOC)->fetchAll();
+                $groups = $this->db->query("select gid, name, acronym, admin, login as \"adminLogin\" from core_groups left join core_users on core_groups.admin = core_users.uid where gid = $gid", \PDO::FETCH_ASSOC)->fetchAll();
 
                 if (count($groups)) {
+                    $this->cacheSet($key, $groups[0]);
                     return $groups[0];
                 } else {
+                    $this->unCache($key);
                     return false;
                 }
             }
@@ -57,20 +74,24 @@
              * @param integer $gid gid
              * @param string $acronym
              * @param string $name group name
+             * @param integer $admin uid
              *
              * @return boolean
              */
 
-            public function modifyGroup($gid, $acronym, $name) {
+            public function modifyGroup($gid, $acronym, $name, $admin) {
+                $this->clearCache();
+
                 if (!checkInt($gid)) {
                     return false;
                 }
 
                 try {
-                    $sth = $this->db->prepare("update core_groups set acronym = :acronym, name = :name where gid = $gid");
+                    $sth = $this->db->prepare("update core_groups set acronym = :acronym, name = :name, admin = :admin where gid = $gid");
                     return $sth->execute([
                         ":acronym" => trim($acronym),
                         ":name" => trim($name),
+                        ":admin" => (int)$admin,
                     ]);
                 } catch (\Exception $e) {
                     error_log(print_r($e, true));
@@ -88,6 +109,8 @@
              */
 
             public function addGroup($acronym, $name) {
+                $this->clearCache();
+
                 $acronym = trim($acronym);
 
                 try {
@@ -114,6 +137,8 @@
              */
             
             public function deleteGroup($gid) {
+                $this->clearCache();
+
                 if (!checkInt($gid)) {
                     return false;
                 }
@@ -135,18 +160,26 @@
              */
 
             public function getUsers($gid) {
+                $key = "USERS:$gid";
+
+                $cache = $this->cacheGet($key);
+                if ($cache) {
+                    return $cache;
+                }
+
                 if (!checkInt($gid)) {
                     return false;
                 }
 
                 $uids = $this->db->query("select uid from core_users_groups where gid = $gid", \PDO::FETCH_ASSOC)->fetchAll();
 
-                $users = [];
+                $_users = [];
                 foreach ($uids as $uid) {
-                    $users[] = $uid["uid"];
+                    $_users[] = $uid["uid"];
                 }
 
-                return $users;
+                $this->cacheSet($key, $_users);
+                return $_users;
             }
 
             /**
@@ -155,7 +188,9 @@
              * @return boolean
              */
 
-            public function setUsers($gid, $uids) {
+             public function setUsers($gid, $uids) {
+                $this->clearCache();
+
                 // TODO: add transaction, commint, rollback
 
                 if (!checkInt($gid)) {
@@ -192,7 +227,54 @@
                 return true;
             }
 
+            /**
+             * modify user groups
+             *
+             * @return boolean
+             */
+
+             public function setGroups($uid, $gids) {
+                $this->clearCache();
+
+                // TODO: add transaction, commint, rollback
+
+                if (!checkInt($uid)) {
+                    return false;
+                }
+
+                try {
+                    $sth = $this->db->prepare("insert into core_users_groups (uid, gid) values (:uid, :gid)");
+                } catch (\Exception $e) {
+                    error_log(print_r($e, true));
+                    return false;
+                }
+
+                try {
+                    $this->db->exec("delete from core_users_groups where uid = $uid");
+                } catch (\Exception $e) {
+                    error_log(print_r($e, true));
+                    return false;
+                }
+
+                foreach ($gids as $gid) {
+                    if (!checkInt($gid)) {
+                        return false;
+                    }
+
+                    if (!$sth->execute([
+                        ":uid" => $uid,
+                        ":gid" => $gid,
+                    ])) {
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+
             public function deleteUser($uid) {
+                $this->clearCache();
+
                 if (!checkInt($gid)) {
                     return false;
                 }
@@ -216,7 +298,7 @@
                     "delete from core_users_rights where uid not in (select uid from core_users)",
                     "delete from core_groups_rights where gid not in (select gid from core_groups)",
                     "delete from core_users_groups where uid not in (select uid from core_users)",
-                    "delete from core_users_groups where gid not in (select uid from core_groups)",
+                    "delete from core_users_groups where gid not in (select gid from core_groups)",
                 ];
 
                 for ($i = 0; $i < count($c); $i++) {
@@ -232,6 +314,45 @@
                 return [
                     "mode" => "rw",
                 ];
+            }
+
+            /**
+             * @inheritDoc
+             */
+            public function getGroupByAcronym($acronym)
+            {
+                return $this->db->get("select gid from core_groups where acronym = :acronym", [
+                    "acronym" => $acronym,
+                ], [
+                    "gid" => "gid",
+                ], [
+                    "fieldlify"
+                ]);
+            }
+
+            /**
+             * @inheritDoc
+             */
+            public function addUserToGroup($uid, $gid)
+            {
+                $this->clearCache();
+
+                if (!checkInt($uid) || !checkInt($gid)) {
+                    return false;
+                }
+
+                return $this->db->insert("insert into core_users_groups (uid, gid) values ($uid, $gid)");
+            }
+
+            /**
+             * @inheritDoc
+             */
+            public function cron($part) {
+                if ($part == "5min") {
+                    $this->cleanup();
+                }
+
+                return true;
             }
         }
     }

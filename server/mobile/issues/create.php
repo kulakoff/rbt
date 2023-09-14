@@ -26,8 +26,20 @@
  * 417 ожидание не удалось
  */
 
+function createIssue($adapter, $phone, $data) {
+    $description = $data['issue']['description'];
+    if (strpos($description, 'Обработать запрос на добавление видеофрагмента из архива видовой видеокамеры') !== false) {
+        return $adapter->createIssueForDVRFragment($phone, $description, null, null, null, null);
+    }
+}
+
     auth();
-    response();
+    $adapter = loadBackend('issue_adapter');
+    $result = createIssue($adapter, $subscriber['mobile'], $postdata);
+    if ($result !== false)
+        response(200, $result);
+    else
+        response(417, false, false, "Не удалось создать заявку.");
 
 /*
     jira_require();

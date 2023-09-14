@@ -111,9 +111,13 @@
                         select count(*) as allow from core_api_methods where aid in (
                             select aid from (
                                 select aid from core_api_methods where aid in (
-                                    select aid from core_groups_rights where allow = 1 and gid in (
-                                        select gid from core_users_groups where uid = :uid
-                                     )
+                                    select aid from core_groups_rights where allow = 1 and (
+                                        gid in (select gid from core_users_groups where uid = :uid)
+                                        or
+                                        gid in (select primary_group from core_users where uid = :uid)
+                                        or
+                                        gid in (select gid from core_groups where admin = :uid)
+                                    )
                                 ) or aid in (select aid from core_api_methods_common)
                             ) as t1 where
                                 aid not in (select aid from core_groups_rights where allow = 0 and gid in (select gid from core_users_groups where uid = :uid)) and
@@ -178,6 +182,13 @@
              */
 
             public function allowedMethods($uid) {
+                $key = "ALLOWED:$uid";
+
+                $cache = $this->cacheGet($key);
+                if ($cache) {
+                    return $cache;
+                }
+
                 if (!checkInt($uid)) {
                     return false;
                 }
@@ -185,15 +196,19 @@
                 if ($uid === 0) {
                     return $this->methods();
                 } else {
-                    $m = [];
+                    $_m = [];
                     try {
                         $sth = $this->db->prepare("
                             select * from core_api_methods where aid in (
                                 select aid from (
                                     select aid from core_api_methods where aid in (
-                                        select aid from core_groups_rights where allow = 1 and gid in (
-                                            select gid from core_users_groups where uid = :uid
-                                         )
+                                        select aid from core_groups_rights where allow = 1 and (
+                                            gid in (select gid from core_users_groups where uid = :uid)
+                                            or
+                                            gid in (select primary_group from core_users where uid = :uid)
+                                            or
+                                            gid in (select gid from core_groups where admin = :uid)
+                                        )
                                     ) or 
                                     aid in (select aid from core_api_methods_common) or
                                     aid in (select aid from core_api_methods_personal) or   
@@ -213,7 +228,7 @@
                             $all = $sth->fetchAll(\PDO::FETCH_ASSOC);
                             $r = [];
                             foreach ($all as $a) {
-                                $m[$a['api']][$a['method']][$a['request_method']] = $a['aid'];
+                                $_m[$a['api']][$a['method']][$a['request_method']] = $a['aid'];
                                 $r[$a['aid']] = true;
                             }
 
@@ -231,17 +246,19 @@
                             ", \PDO::FETCH_ASSOC)->fetchAll();
 
                             foreach ($same as $a) {
-                                if ($r[$a["permissions_same"]]) {
-                                    $m[$a['api']][$a['method']][$a['request_method']] = $a['aid'];
+                                if (@$r[$a["permissions_same"]]) {
+                                    $_m[$a['api']][$a['method']][$a['request_method']] = $a['aid'];
                                 }
                             }
                         }
                     } catch (\Exception $e) {
                         error_log(print_r($e, true));
+                        $this->unCache($key);
                         return false;
                     }
 
-                    return $m;
+                    $this->cacheSet($key, $_m);
+                    return $_m;
                 }
             }
 
@@ -250,8 +267,8 @@
              */
 
             public function getRights() {
-                $users = $this->db->query("select uid, aid, allow from core_users_rights", \PDO::FETCH_ASSOC)->fetchAll();
-                $groups = $this->db->query("select gid, aid, allow from core_groups_rights", \PDO::FETCH_ASSOC)->fetchAll();
+                $users = $this->db->query("select uid, aid, allow from core_users_rights order by uid, aid", \PDO::FETCH_ASSOC)->fetchAll();
+                $groups = $this->db->query("select gid, aid, allow from core_groups_rights order by gid, aid", \PDO::FETCH_ASSOC)->fetchAll();
 
                 return [
                     "users" => $users,
@@ -274,6 +291,8 @@
 
 
             public function setRights($user, $id, $api, $method, $allow, $deny) {
+                $this->clearCache();
+
                 if (!checkInt($id)) {
                     return false;
                 }
@@ -351,13 +370,11 @@
                     "delete from core_users_rights where uid not in (select uid from core_users)",
                     "delete from core_groups_rights where gid not in (select gid from core_groups)",
                     "delete from core_users_groups where uid not in (select uid from core_users)",
-                    "delete from core_users_groups where gid not in (select uid from core_groups)",
+                    "delete from core_users_groups where gid not in (select gid from core_groups)",
                 ];
 
                 for ($i = 0; $i < count($c); $i++) {
-                    $del = $this->db->prepare($c[$i]);
-                    $del->execute();
-                    $n += $del->rowCount();
+                    $n += $this->db->modify($c[$i]);
                 }
 
                 return $n;

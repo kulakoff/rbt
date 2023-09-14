@@ -2,31 +2,48 @@
 
     class PDO_EXT extends PDO {
 
-        function trimParams($map) {
+        public function __construct($dsn, $username = null, $password = null, $options = null)
+        {
+            parent::__construct($dsn, $username, $password, $options);
+
+            $this->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        }
+
+        function trimParams($map)
+        {
             $remap = [];
 
-            foreach ($map as $key => $value) {
-                if (is_null($value)) {
-                    $remap[$key] = $value;
-                } else {
-                    $remap[$key] = trim($value);
+            if ($map) {
+                foreach ($map as $key => $value) {
+                    if (is_null($value)) {
+                        $remap[$key] = $value;
+                    } else {
+                        $remap[$key] = trim($value);
+                    }
                 }
             }
 
             return $remap;
         }
 
-        function insert($query, $params = []) {
+        function insert($query, $params = [], $options = [])
+        {
             try {
                 $sth = $this->prepare($query);
                 if ($sth->execute($this->trimParams($params))) {
-                    return $this->lastInsertId();
+                    try {
+                        return $this->lastInsertId();
+                    } catch (\Exception $e) {
+                        return -1;
+                    }
                 } else {
                     return false;
                 }
             } catch (\PDOException $e) {
-                setLastError($e->errorInfo[2]?:$e->getMessage());
-                error_log(print_r($e, true));
+                if (!in_array("silent", $options)) {
+                    setLastError($e->errorInfo[2] ?: $e->getMessage());
+                    error_log(print_r($e, true));
+                }
                 return false;
             } catch (\Exception $e) {
                 setLastError($e->getMessage());
@@ -35,7 +52,8 @@
             }
         }
 
-        function modify($query, $params = []) {
+        function modify($query, $params = [], $options = [])
+        {
             try {
                 $sth = $this->prepare($query);
                 if ($sth->execute($this->trimParams($params))) {
@@ -44,8 +62,10 @@
                     return false;
                 }
             } catch (\PDOException $e) {
-                setLastError($e->errorInfo[2]?:$e->getMessage());
-                error_log(print_r($e, true));
+                if (!in_array("silent", $options)) {
+                    setLastError($e->errorInfo[2] ?: $e->getMessage());
+                    error_log(print_r($e, true));
+                }
                 return false;
             } catch (\Exception $e) {
                 setLastError($e->getMessage());
@@ -54,7 +74,8 @@
             }
         }
 
-        function modifyEx($query, $map, $params) {
+        function modifyEx($query, $map, $params, $options = [])
+        {
             $mod = false;
             try {
                 foreach ($map as $db => $param) {
@@ -71,8 +92,10 @@
                 }
                 return $mod;
             } catch (\PDOException $e) {
-                setLastError($e->errorInfo[2]?:$e->getMessage());
-                error_log(print_r($e, true));
+                if (!in_array("silent", $options)) {
+                    setLastError($e->errorInfo[2] ?: $e->getMessage());
+                    error_log(print_r($e, true));
+                }
                 return false;
             } catch (\Exception $e) {
                 setLastError($e->getMessage());
@@ -81,7 +104,18 @@
             }
         }
 
-        function get($query, $params = [], $map = [], $options = []) {
+        function queryEx($query)
+        {
+            $sth = $this->prepare($query);
+            if ($sth->execute()) {
+                return $sth->fetchAll(\PDO::FETCH_ASSOC);
+            } else {
+                return [];
+            }
+        }
+
+        function get($query, $params = [], $map = [], $options = [])
+        {
             try {
                 if ($params) {
                     $sth = $this->prepare($query);
@@ -91,7 +125,7 @@
                         return false;
                     }
                 } else {
-                    $a = $this->query($query, \PDO::FETCH_ASSOC)->fetchAll();
+                    $a = $this->queryEx($query);
                 }
 
                 $r = [];
@@ -127,17 +161,15 @@
                 return $r;
 
             } catch (\PDOException $e) {
-                setLastError($e->errorInfo[2]?:$e->getMessage());
-                error_log(print_r($e, true));
+                if (!in_array("silent", $options)) {
+                    setLastError($e->errorInfo[2] ?: $e->getMessage());
+                    error_log(print_r($e, true));
+                }
                 return false;
             } catch (\Exception $e) {
                 setLastError($e->getMessage());
                 error_log(print_r($e, true));
                 return false;
             }
-        }
-
-        function now() {
-            return date("Y-m-d H:i:s.000");
         }
     }

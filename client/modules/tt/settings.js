@@ -21,6 +21,18 @@
         always(modules.tt.settings.renderProjects);
     },
 
+    doAddStatus: function (status) {
+        loadingStart();
+        POST("tt", "status", false, {
+            status: status,
+        }).
+        fail(FAIL).
+        done(() => {
+            message(i18n("tt.statusWasAdded"));
+        }).
+        always(modules.tt.settings.renderStatuses);
+    },
+
     doAddResolution: function (resolution) {
         loadingStart();
         POST("tt", "resolution", false, {
@@ -33,9 +45,10 @@
         always(modules.tt.settings.renderResolutions);
     },
 
-    doAddCustomField: function (type, field, fieldDisplay) {
+    doAddCustomField: function (catalog, type, field, fieldDisplay) {
         loadingStart();
         POST("tt", "customField", false, {
+            catalog: catalog,
             type: type,
             field: field,
             fieldDisplay: fieldDisplay,
@@ -45,6 +58,22 @@
             message(i18n("tt.customFieldWasAdded"));
         }).
         always(modules.tt.settings.renderCustomFields);
+    },
+
+    doAddProjectFilter: function (projectId, filter, personal) {
+        loadingStart();
+        POST("tt", "project", projectId, {
+            filter: filter,
+            personal: personal,
+        }).
+        fail(FAIL).
+        fail(loadingDone).
+        done(() => {
+            message(i18n("tt.projectWasChanged"));
+        }).
+        done(() => {
+            modules.tt.settings.projectFilters(projectId);
+        });
     },
 
     doAddProjectUser: function (projectId, uid, roleId) {
@@ -81,11 +110,13 @@
         });
     },
 
-    doAddTag: function (projectId, tag) {
+    doAddTag: function (projectId, tag, foreground, background) {
         loadingStart();
         POST("tt", "tag", false, {
             projectId: projectId,
             tag: tag,
+            foreground,
+            background,
         }).
         fail(FAIL).
         fail(loadingDone).
@@ -97,12 +128,29 @@
         });
     },
 
-    doModifyProject: function (projectId, acronym, project) {
+    doAddCrontab: function (crontab) {
         loadingStart();
-        PUT("tt", "project", projectId, {
-            acronym: acronym,
-            project: project,
+        POST("tt", "crontab", false, crontab).
+        fail(FAIL).
+        done(() => {
+            message(i18n("tt.crontabWasAdded"));
         }).
+        always(modules.tt.settings.renderCrontabs);
+    },
+
+    doDeleteCrontab: function (crontabId) {
+        loadingStart();
+        DELETE("tt", "crontab", crontabId).
+        fail(FAIL).
+        done(() => {
+            message(i18n("tt.crontabWasDeleted"));
+        }).
+        always(modules.tt.settings.renderCrontabs);
+    },
+
+    doModifyProject: function (project) {
+        loadingStart();
+        PUT("tt", "project", project["projectId"], project).
         fail(FAIL).
         done(() => {
             message(i18n("tt.projectWasChanged"));
@@ -120,6 +168,21 @@
         always(modules.tt.settings.renderProjects);
     },
 
+    doDeleteProjectFilter: function (projectId, projectFilterId) {
+        loadingStart();
+        DELETE("tt", "project", false, {
+            filter: projectFilterId,
+        }).
+        fail(FAIL).
+        fail(loadingDone).
+        done(() => {
+            message(i18n("tt.projectWasChanged"));
+        }).
+        done(() => {
+            modules.tt.settings.projectFilters(projectId);
+        });
+    },
+
     doDeleteCustomField: function (customFieldId) {
         loadingStart();
         DELETE("tt", "customField", customFieldId).
@@ -133,17 +196,17 @@
         always(modules.tt.settings.renderCustomFields);
     },
 
-    doSetWorkflowAlias: function (workflow, alias) {
+    doDeleteViewer: function (field, name) {
         loadingStart();
-        PUT("tt", "workflow", false, {
-            workflow: workflow,
-            alias: alias,
+        DELETE("tt", "viewer", false, {
+            field: field,
+            name: name,
         }).
         fail(FAIL).
         done(() => {
-            message(i18n("tt.workflowWasChanged"));
+            message(i18n("tt.viewerWasDeleted"));
         }).
-        always(modules.tt.settings.renderWorkflows);
+        always(modules.tt.settings.renderViewers);
     },
 
     doSetProjectWorkflows: function (projectId, workflows) {
@@ -182,10 +245,22 @@
         always(modules.tt.settings.renderProjects);
     },
 
-    doModifyStatus: function (statusId, display) {
+    doSetProjectViewers: function (projectId, viewers) {
+        loadingStart();
+        PUT("tt", "project", projectId, {
+            viewers: viewers,
+        }).
+        fail(FAIL).
+        done(() => {
+            message(i18n("tt.projectWasChanged"));
+        }).
+        always(modules.tt.settings.renderProjects);
+    },
+
+    doModifyStatus: function (statusId, status) {
         loadingStart();
         PUT("tt", "status", statusId, {
-            statusDisplay: display,
+            status: status,
         }).
         fail(FAIL).
         done(() => {
@@ -206,10 +281,12 @@
         always(modules.tt.settings.renderResolutions);
     },
 
-    doModifyTag: function (tagId, tag, projectId) {
+    doModifyTag: function (tagId, tag, foreground, background, projectId) {
         loadingStart();
         PUT("tt", "tag", tagId, {
             tag: tag,
+            foreground: foreground,
+            background: background,
         }).
         fail(FAIL).
         fail(loadingDone).
@@ -256,23 +333,14 @@
         fail(FAIL).
         fail(loadingDone).
         done(() => {
-            message(i18n("tt.projectWasChanged"));
+            message(i18n("tt.roleWasChanged"));
         }).
         done(modules.tt.settings.renderRoles);
     },
 
-    doModifyCustomField: function (customFieldId, fieldDisplay, fieldDescription, regex, format, link, options, indexes, required) {
+    doModifyCustomField: function (customFieldId, field) {
         loadingStart();
-        PUT("tt", "customField", customFieldId, {
-            fieldDisplay: fieldDisplay,
-            fieldDescription: fieldDescription,
-            regex: regex,
-            format: format,
-            link: link,
-            options: options,
-            indexes: indexes,
-            required: required,
-        }).
+        PUT("tt", "customField", customFieldId, field).
         fail(FAIL).
         done(() => {
             message(i18n("tt.customFieldWasChanged"));
@@ -332,6 +400,29 @@
         }).show();
     },
 
+    addStatus: function () {
+        cardForm({
+            title: i18n("tt.addStatus"),
+            footer: true,
+            borderless: true,
+            topApply: true,
+            fields: [
+                {
+                    id: "status",
+                    type: "text",
+                    title: i18n("tt.status"),
+                    placeholder: i18n("tt.status"),
+                    validate: (v) => {
+                        return $.trim(v) !== "";
+                    }
+                },
+            ],
+            callback: function (result) {
+                modules.tt.settings.doAddStatus(result.status);
+            },
+        }).show();
+    },
+
     addResolution: function () {
         cardForm({
             title: i18n("tt.addResolution"),
@@ -356,6 +447,17 @@
     },
 
     addCustomField: function () {
+        let cfc = [];
+        let a = {};
+        for (let i in modules.tt.meta.customFields) {
+            if (modules.tt.meta.customFields[i].catalog && !a[modules.tt.meta.customFields[i].catalog]) {
+                a[modules.tt.meta.customFields[i].catalog] = true;
+                cfc.push({
+                    id: modules.tt.meta.customFields[i].catalog,
+                    text: modules.tt.meta.customFields[i].catalog,
+                });
+            }
+        }
         $("#altForm").hide();
         cardForm({
             title: i18n("tt.addCustomField"),
@@ -374,6 +476,15 @@
                     }
                 },
                 {
+                    id: "catalog",
+                    type: "select2",
+                    title: i18n("tt.customFieldCatalog"),
+                    placeholder: i18n("tt.customFieldCatalog"),
+                    tags: true,
+                    createTags: true,
+                    options: cfc,
+                },
+                {
                     id: "type",
                     type: "select2",
                     title: i18n("tt.customFieldType"),
@@ -381,32 +492,28 @@
                     minimumResultsForSearch: Infinity,
                     options: [
                         {
-                            id: "TextString",
-                            text: i18n("tt.customFieldTypeTextString"),
+                            id: "text",
+                            text: i18n("tt.customFieldTypeText"),
                         },
                         {
-                            id: "TextArea",
-                            text: i18n("tt.customFieldTypeTextArea"),
-                        },
-                        {
-                            id: "Integer",
-                            text: i18n("tt.customFieldTypeInteger"),
-                        },
-                        {
-                            id: "Real",
-                            text: i18n("tt.customFieldTypeReal"),
-                        },
-                        {
-                            id: "Select",
+                            id: "select",
                             text: i18n("tt.customFieldTypeSelect"),
                         },
                         {
-                            id: "MultiSelect",
-                            text: i18n("tt.customFieldTypeMultiSelect"),
+                            id: "users",
+                            text: i18n("tt.customFieldTypeUsers"),
                         },
                         {
-                            id: "Users",
-                            text: i18n("tt.customFieldTypeUsers"),
+                            id: "issues",
+                            text: i18n("tt.customFieldTypeIssues"),
+                        },
+                        {
+                            id: "geo",
+                            text: i18n("tt.customFieldTypeGeo"),
+                        },
+                        {
+                            id: "array",
+                            text: i18n("tt.customFieldTypeArray"),
                         },
                     ]
                 },
@@ -421,7 +528,7 @@
                 },
             ],
             callback: function (result) {
-                modules.tt.settings.doAddCustomField(result.type, result.field, result.fieldDisplay);
+                modules.tt.settings.doAddCustomField(result.catalog, result.type, result.field, result.fieldDisplay);
             },
         }).show();
     },
@@ -509,6 +616,7 @@
 
     modifyProject: function (projectId) {
         let project = false;
+
         for (let i in modules.tt.meta.projects) {
             if (modules.tt.meta.projects[i].projectId == projectId) {
                 project = modules.tt.meta.projects[i];
@@ -521,6 +629,7 @@
             footer: true,
             borderless: true,
             topApply: true,
+            size: "lg",
             fields: [
                 {
                     id: "projectId",
@@ -549,31 +658,121 @@
                         return $.trim(v) !== "";
                     }
                 },
+                {
+                    id: "maxFileSize",
+                    type: "select2",
+                    value: project.maxFileSize,
+                    title: i18n("tt.maxFileSize"),
+                    options: [
+                        {
+                            id: 1024 * 1024,
+                            text: "1Mb"
+                        },
+                        {
+                            id: 2 * 1024 * 1024,
+                            text: "2Mb"
+                        },
+                        {
+                            id: 4 * 1024 * 1024,
+                            text: "4Mb"
+                        },
+                        {
+                            id: 8 * 1024 * 1024,
+                            text: "8Mb"
+                        },
+                        {
+                            id: 16 * 1024 * 1024,
+                            text: "16Mb"
+                        },
+                        {
+                            id: 32 * 1024 * 1024,
+                            text: "32Mb"
+                        },
+                        {
+                            id: 64 * 1024 * 1024,
+                            text: "64Mb"
+                        },
+                    ],
+                    validate: (v) => {
+                        return parseInt(v) >= 0 && parseInt(v) <= 64 * 1024 * 1024;
+                    }
+                },
+                {
+                    id: "searchSubject",
+                    type: "yesno",
+                    value: project.searchSubject,
+                    title: i18n("tt.searchSubject"),
+                    placeholder: i18n("tt.searchSubject"),
+                },
+                {
+                    id: "searchDescription",
+                    type: "yesno",
+                    value: project.searchDescription,
+                    title: i18n("tt.searchDescription"),
+                    placeholder: i18n("tt.searchDescription"),
+                },
+                {
+                    id: "searchComments",
+                    type: "yesno",
+                    value: project.searchComments,
+                    title: i18n("tt.searchComments"),
+                    placeholder: i18n("tt.searchComments"),
+                },
+                {
+                    id: "assigned",
+                    type: "select",
+                    value: project.assigned,
+                    title: i18n("tt.assigned"),
+                    options: [
+                        {
+                            id: "0",
+                            text: i18n("tt.assignedUsersAndGroups"),
+                        },
+                        {
+                            id: "1",
+                            text: i18n("tt.assignedOnlyUsers"),
+                        },
+                        {
+                            id: "2",
+                            text: i18n("tt.assignedOnlyGroups"),
+                        },
+                        {
+                            id: "3",
+                            text: i18n("tt.assignedUsersAndGroupsMultiple"),
+                        },
+                        {
+                            id: "4",
+                            text: i18n("tt.assignedOnlyUsersMultiple"),
+                        },
+                        {
+                            id: "5",
+                            text: i18n("tt.assignedOnlyGroupsMultiple"),
+                        },
+                    ],
+                },
             ],
             delete: i18n("tt.projectDelete"),
             callback: function (result) {
                 if (result.delete === "yes") {
                     modules.tt.settings.deleteProject(result.projectId);
                 } else {
-                    modules.tt.settings.doModifyProject(result.projectId, result.acronym, result.project);
+                    modules.tt.settings.doModifyProject(result);
                 }
             },
         }).show();
     },
 
     modifyStatus: function (statusId) {
-        let display = '';
         let status = '';
 
         for (let i in modules.tt.meta.statuses) {
             if (modules.tt.meta.statuses[i].statusId == statusId) {
                 status = modules.tt.meta.statuses[i].status;
-                display = modules.tt.meta.statuses[i].statusDisplay;
             }
         }
 
         cardForm({
-            title: i18n("tt.workflowAlias"),
+            title: i18n("tt.status"),
             footer: true,
             borderless: true,
             topApply: true,
@@ -590,21 +789,18 @@
                     type: "text",
                     title: i18n("tt.status"),
                     value: status,
-                    readonly: true,
-                },
-                {
-                    id: "display",
-                    type: "text",
-                    title: i18n("tt.statusDisplay"),
-                    placeholder: i18n("tt.statusDisplay"),
-                    value: display,
                     validate: v => {
                         return $.trim(v) !== "";
                     }
                 },
             ],
+            delete: i18n("tt.statusDelete"),
             callback: function (result) {
-                modules.tt.settings.doModifyStatus(statusId, result.display);
+                if (result.delete === "yes") {
+                    modules.tt.settings.deleteStatus(statusId);
+                } else {
+                    modules.tt.settings.doModifyStatus(statusId, result.status);
+                }
             },
         }).show();
     },
@@ -619,7 +815,7 @@
         }
 
         cardForm({
-            title: i18n("tt.workflowAlias"),
+            title: i18n("tt.resolution"),
             footer: true,
             borderless: true,
             topApply: true,
@@ -634,7 +830,7 @@
                 {
                     id: "resolution",
                     type: "text",
-                    title: i18n("tt.resolution"),
+                    title: i18n("tt.resolutionName"),
                     value: resolution,
                 },
             ],
@@ -661,7 +857,7 @@
         }
 
         cardForm({
-            title: i18n("tt.roles"),
+            title: i18n("tt.role"),
             footer: true,
             borderless: true,
             topApply: true,
@@ -703,6 +899,18 @@
         fail(FAIL).
         done(modules.tt.tt).
         done(() => {
+            let cfc = [];
+            let a = {};
+            for (let i in modules.tt.meta.customFields) {
+                if (modules.tt.meta.customFields[i].catalog && !a[modules.tt.meta.customFields[i].catalog]) {
+                    a[modules.tt.meta.customFields[i].catalog] = true;
+                    cfc.push({
+                        id: modules.tt.meta.customFields[i].catalog,
+                        text: modules.tt.meta.customFields[i].catalog,
+                    });
+                }
+            }
+
             let cf = {};
             for (let i in modules.tt.meta.customFields) {
                 if (modules.tt.meta.customFields[i].customFieldId == customFieldId) {
@@ -710,8 +918,29 @@
                 }
             }
 
-            if (cf.workflow) {
-                let fields = [
+            let options = "";
+
+            for (let i in cf.options) {
+                options += cf.options[i].optionDisplay + "\n";
+            }
+
+            cardForm({
+                title: i18n("tt.customField") + " " + i18n("tt.customFieldId") + customFieldId,
+                footer: true,
+                borderless: true,
+                topApply: true,
+                target: "#altForm",
+                fields: [
+                    {
+                        id: "catalog",
+                        type: "select2",
+                        title: i18n("tt.customFieldCatalog"),
+                        placeholder: i18n("tt.customFieldCatalog"),
+                        tags: true,
+                        createTags: true,
+                        options: cfc,
+                        value: cf.catalog,
+                    },
                     {
                         id: "field",
                         type: "text",
@@ -724,7 +953,7 @@
                         type: "text",
                         title: i18n("tt.customFieldType"),
                         readonly: true,
-                        value: i18n("tt.customFieldType" + cf.type),
+                        value: i18n("tt.customFieldType" + cf.type.charAt(0).toUpperCase() + cf.type.slice(1)),
                     },
                     {
                         id: "fieldDisplay",
@@ -738,10 +967,86 @@
                     },
                     {
                         id: "fieldDescription",
-                        type: "area",
+                        type: "text",
                         title: i18n("tt.customFieldDescription"),
                         placeholder: i18n("tt.customFieldDescription"),
                         value: cf.fieldDescription,
+                    },
+                    {
+                        id: "regex",
+                        type: "text",
+                        title: i18n("tt.customFieldRegex"),
+                        placeholder: i18n("tt.customFieldRegex"),
+                        value: cf.regex,
+                        hint: i18n("forExample") + " ^[A-Z0-9]+$",
+                        hidden: cf.type !== "text",
+                    },
+                    {
+                        id: "format",
+                        type: "text",
+                        title: i18n("tt.customFieldDisplayFormat"),
+                        placeholder: i18n("tt.customFieldDisplayFormat"),
+                        value: cf.format,
+                        hint: i18n("forExample") + " %.02d",
+                        hidden: cf.type !== "text",
+                    },
+                    {
+                        id: "editor",
+                        type: "select2",
+                        title: i18n("tt.customFieldEditor"),
+                        placeholder: i18n("tt.customFieldEditor"),
+                        value: cf.editor,
+                        options: [
+                            {
+                                id: "text",
+                                text: i18n("tt.customFieldEditorString"),
+                            },
+                            {
+                                id: "text-ro",
+                                text: i18n("tt.customFieldEditorStringRO"),
+                            },
+                            {
+                                id: "number",
+                                text: i18n("tt.customFieldEditorNumber"),
+                            },
+                            {
+                                id: "area",
+                                text: i18n("tt.customFieldEditorText"),
+                            },
+                            {
+                                id: "email",
+                                text: i18n("tt.customFieldEditorEmail"),
+                            },
+                            {
+                                id: "tel",
+                                text: i18n("tt.customFieldEditorTel"),
+                            },
+                            {
+                                id: "date",
+                                text: i18n("tt.customFieldEditorDate"),
+                            },
+                            {
+                                id: "time",
+                                text: i18n("tt.customFieldEditorTime"),
+                            },
+                            {
+                                id: "datetime-local",
+                                text: i18n("tt.customFieldEditorDateTime"),
+                            },
+                            {
+                                id: "yesno",
+                                text: i18n("tt.customFieldEditorYesNo"),
+                            },
+                            {
+                                id: "noyes",
+                                text: i18n("tt.customFieldEditorNoYes"),
+                            },
+                            {
+                                id: "json",
+                                text: i18n("tt.customFieldEditorJSON"),
+                            },
+                        ],
+                        hidden: cf.type !== "text",
                     },
                     {
                         id: "link",
@@ -750,227 +1055,102 @@
                         placeholder: i18n("tt.customFieldLink"),
                         value: cf.link,
                         hint: i18n("forExample") + " https://example.com/?search=%value%",
+                        hidden: cf.type === "issues" || cf.type === "geo" || cf.type === "array",
                     },
-                ];
-
-                if (cf.type === "Select" || cf.type === "MultiSelect") {
-                    fields.push({
-                        id: "-",
-                    });
-                    for (let i in cf.options) {
-                        let t = cf.options[i].option;
-                        fields.push({
-                            id: "_cfWorkflowOption_" + cf.options[i].customFieldOptionId,
-                            type: "text",
-                            title: t,
-                            placeholder: t,
-                            value: cf.options[i].optionDisplay?cf.options[i].optionDisplay:cf.options[i].option,
-                            validate: (v, prefix) => {
-                                return $(`#${prefix}delete`).val() === "yes" || $.trim(v) !== "";
-                            }
-                        });
-                    }
-                }
-
-                cardForm({
-                    title: i18n("tt.customFieldField") + " " + i18n("tt.customFieldId") + customFieldId,
-                    footer: true,
-                    borderless: true,
-                    topApply: true,
-                    target: "#altForm",
-                    fields: fields,
-                    callback: function (result) {
-                        let options = {};
-                        if (cf.type === "Select" || cf.type === "MultiSelect") {
-                            for (let i in result) {
-                                if (i.indexOf("_cfWorkflowOption_") === 0) {
-                                    options[i.split("_cfWorkflowOption_")[1]] = result[i];
-                                }
-                            }
-                        }
-                        modules.tt.settings.doModifyCustomField(customFieldId, result.fieldDisplay, result.fieldDescription, false, false, result.link, options);
-                    },
-                    cancel: function () {
-                        $("#altForm").hide();
-                    }
-                }).show();
-            } else {
-                let options = "";
-
-                for (let i in cf.options) {
-                    options += cf.options[i].optionDisplay + "\n";
-                }
-
-                cardForm({
-                    title: i18n("tt.customFieldField") + " " + i18n("tt.customFieldId") + customFieldId,
-                    footer: true,
-                    borderless: true,
-                    topApply: true,
-                    target: "#altForm",
-                    fields: [
-                        {
-                            id: "field",
-                            type: "text",
-                            title: i18n("tt.customFieldField"),
-                            readonly: true,
-                            value: cf.field,
-                        },
-                        {
-                            id: "type",
-                            type: "text",
-                            title: i18n("tt.customFieldType"),
-                            readonly: true,
-                            value: i18n("tt.customFieldType" + cf.type),
-                        },
-                        {
-                            id: "fieldDisplay",
-                            type: "text",
-                            title: i18n("tt.customFieldDisplay"),
-                            placeholder: i18n("tt.customFieldDisplay"),
-                            value: cf.fieldDisplay,
-                            validate: (v, prefix) => {
-                                return $(`#${prefix}delete`).val() === "yes" || $.trim(v) !== "";
-                            }
-                        },
-                        {
-                            id: "fieldDescription",
-                            type: "area",
-                            title: i18n("tt.customFieldDescription"),
-                            placeholder: i18n("tt.customFieldDescription"),
-                            value: cf.fieldDescription,
-                        },
-                        {
-                            id: "regex",
-                            type: "text",
-                            title: i18n("tt.customFieldRegex"),
-                            placeholder: i18n("tt.customFieldRegex"),
-                            value: cf.regex,
-                            hint: i18n("forExample") + " ^[A-Z0-9]+$",
-                            hidden: cf.type === "Select" || cf.type === "MultiSelect" || cf.type === "Users",
-                        },
-                        {
-                            id: "format",
-                            type: "text",
-                            title: i18n("tt.customFieldDisplayFormat"),
-                            placeholder: i18n("tt.customFieldDisplayFormat"),
-                            value: cf.format,
-                            hint: i18n("forExample") + " %.02d",
-                            hidden: cf.type === "Text" || cf.type === "MultiSelect" || cf.type === "Users",
-                        },
-                        {
-                            id: "link",
-                            type: "text",
-                            title: i18n("tt.customFieldLink"),
-                            placeholder: i18n("tt.customFieldLink"),
-                            value: cf.link,
-                            hint: i18n("forExample") + " https://example.com/?search=%value%",
-                        },
-                        {
-                            id: "options",
-                            type: "area",
-                            title: i18n("tt.customFieldOptions"),
-                            placeholder: i18n("tt.customFieldOptions"),
-                            value: options,
-                            hidden: cf.type !== "Select" && cf.type !== "MultiSelect",
-                            validate: (v, prefix) => {
-                                return $(`#${prefix}delete`).val() === "yes" || $.trim(v) !== "";
-                            }
-                        },
-                        {
-                            id: "usersMultiple",
-                            type: "select",
-                            title: i18n("tt.usersMultiple"),
-                            value: (cf.format && cf.format.indexOf("usersMultiple") >= 0)?"1":"0",
-                            options: [
-                                {
-                                    id: "1",
-                                    text: i18n("yes"),
-                                },
-                                {
-                                    id: "0",
-                                    text: i18n("no"),
-                                },
-                            ],
-                            hidden: cf.type !== "Users",
-                        },
-                        {
-                            id: "usersWithGroups",
-                            type: "select",
-                            title: i18n("tt.usersWithGroups"),
-                            value: (cf.format && cf.format.indexOf("usersWithGroups") >= 0)?"1":"0",
-                            options: [
-                                {
-                                    id: "1",
-                                    text: i18n("yes"),
-                                },
-                                {
-                                    id: "0",
-                                    text: i18n("no"),
-                                },
-                            ],
-                            hidden: cf.type !== "Users",
-                        },
-                        {
-                            id: "indexes",
-                            type: "select",
-                            title: i18n("tt.indexes"),
-                            value: cf.indexes,
-                            options: [
-                                {
-                                    id: "0",
-                                    text: i18n("no"),
-                                },
-                                {
-                                    id: "1",
-                                    text: i18n("tt.index"),
-                                },
-                                {
-                                    id: "2",
-                                    text: i18n("tt.fullText"),
-                                },
-                            ],
-                        },
-                        {
-                            id: "required",
-                            type: "select",
-                            title: i18n("tt.required"),
-                            value: cf.required,
-                            options: [
-                                {
-                                    id: "0",
-                                    text: i18n("no"),
-                                },
-                                {
-                                    id: "1",
-                                    text: i18n("yes"),
-                                },
-                            ],
-                        },
-                    ],
-                    delete: i18n("tt.customFieldDelete"),
-                    callback: function (result) {
-                        if (result.delete === "yes") {
-                            modules.tt.settings.deleteCustomField(customFieldId);
-                        } else {
-                            if (cf.type === "Users") {
-                                result.format = "";
-                                if (result.usersMultiple === "1") {
-                                    result.format += " usersMultiple";
-                                }
-                                if (result.usersWithGroups === "1") {
-                                    result.format += " usersWithGroups";
-                                }
-                                result.format = $.trim(result.format);
-                            }
-                            modules.tt.settings.doModifyCustomField(customFieldId, result.fieldDisplay, result.fieldDescription, result.regex, result.format, result.link, result.options, result.indexes, result.required);
+                    {
+                        id: "options",
+                        type: "area",
+                        title: i18n("tt.customFieldOptions"),
+                        placeholder: i18n("tt.customFieldOptions"),
+                        value: $.trim(options),
+                        hidden: cf.type !== "select",
+                        validate: (v, prefix) => {
+                            return $(`#${prefix}delete`).val() === "yes" || $.trim(v) !== "";
                         }
                     },
-                    cancel: function () {
-                        $("#altForm").hide();
+                    {
+                        id: "editable",
+                        type: "noyes",
+                        title: i18n("tt.editable"),
+                        value: (cf.format && cf.format.split(" ").includes("editable"))?"1":"0",
+                        hidden: cf.type !== "select",
+                    },
+                    {
+                        id: "multiple",
+                        type: "noyes",
+                        title: i18n("tt.multiple"),
+                        value: (cf.format && cf.format.split(" ").includes("multiple"))?"1":"0",
+                        hidden: cf.type === "text" || cf.type === "geo" || cf.type === "array",
+                    },
+                    {
+                        id: "usersAndGroups",
+                        type: "select",
+                        title: i18n("tt.usersAndGroups"),
+                        options: [
+                            {
+                                id: "users",
+                                text: i18n("tt.users"),
+                                selected: cf.format && cf.format.split(" ").includes("users"),
+                            },
+                            {
+                                id: "groups",
+                                text: i18n("tt.groups"),
+                                selected: cf.format && cf.format.split(" ").includes("groups"),
+                            },
+                            {
+                                id: "usersAndGroups",
+                                text: i18n("tt.usersAndGroupsChoice"),
+                                selected: cf.format && cf.format.split(" ").includes("usersAndGroups"),
+                            },
+                        ],
+                        hidden: cf.type !== "users",
+                    },
+                    {
+                        id: "indx",
+                        type: "noyes",
+                        title: i18n("tt.customFieldIndex"),
+                        value: cf.indx,
+                    },
+                    {
+                        id: "search",
+                        type: "noyes",
+                        title: i18n("tt.customFieldSearch"),
+                        value: cf.search,
+                        hidden: cf.type !== "text",
+                    },
+                    {
+                        id: "required",
+                        type: "noyes",
+                        title: i18n("tt.required"),
+                        value: cf.required,
+                    },
+                ],
+                delete: i18n("tt.customFieldDelete"),
+                callback: function (result) {
+                    result.options = $.trim(result.options);
+                    if (result.delete === "yes") {
+                        modules.tt.settings.deleteCustomField(customFieldId);
+                    } else {
+                        result.format = "";
+                        if (result.multiple === "1") {
+                            result.format += " multiple";
+                        }
+                        if (result.editable === "1") {
+                            result.format += " editable";
+                        }
+                        if (cf.type === "users") {
+                            result.format += " " + result.usersAndGroups;
+                        }
+                        result.format = $.trim(result.format);
+                        modules.tt.settings.doModifyCustomField(customFieldId, result);
                     }
-                }).show();
-            }
+                },
+                cancel: function () {
+                    $("#altForm").hide();
+                }
+            }).show();
         }).
+        fail(FAIL).
         always(loadingDone);
     },
 
@@ -986,54 +1166,27 @@
         });
     },
 
+    deleteStatus: function (statusId) {
+        mConfirm(i18n("tt.confirmStatusDelete", statusId.toString()), i18n("confirm"), `danger:${i18n("tt.statusDelete")}`, () => {
+            modules.tt.settings.doDeleteStatus(statusId);
+        });
+    },
+
     deleteResolution: function (resolutionId) {
         mConfirm(i18n("tt.confirmResolutionDelete", resolutionId.toString()), i18n("confirm"), `danger:${i18n("tt.resolutionDelete")}`, () => {
             modules.tt.settings.doDeleteResolution(resolutionId);
         });
     },
 
-    setWorkflowAlias: function (workflow) {
-        let w = '';
-
-        for (let i in modules.tt.meta.workflowAliases) {
-            if (modules.tt.meta.workflowAliases[i].workflow === workflow) {
-                w = modules.tt.meta.workflowAliases[i].alias;
-                break;
-            }
-        }
-
-        cardForm({
-            title: i18n("tt.workflowAlias"),
-            footer: true,
-            borderless: true,
-            topApply: true,
-            fields: [
-                {
-                    id: "workflow",
-                    type: "text",
-                    title: i18n("tt.workflow"),
-                    value: workflow,
-                    readonly: true,
-                },
-                {
-                    id: "alias",
-                    type: "text",
-                    title: i18n("tt.workflowAlias"),
-                    placeholder: i18n("tt.workflowAlias"),
-                    value: w,
-                    validate: (v) => {
-                        return $.trim(v) !== "";
-                    }
-                },
-            ],
-            callback: function (result) {
-                modules.tt.settings.doSetWorkflowAlias(workflow, result.alias);
-            },
-        }).show();
+    deleteViewer: function (field, name) {
+        mConfirm(i18n("tt.confirmViewerDelete", field + " [" + name + "]"), i18n("confirm"), `danger:${i18n("tt.viewerDelete")}`, () => {
+            modules.tt.settings.doDeleteViewer(field, name);
+        });
     },
 
     projectWorkflows: function (projectId) {
         let project = false;
+
         for (let i in modules.tt.meta.projects) {
             if (modules.tt.meta.projects[i].projectId == projectId) {
                 project = modules.tt.meta.projects[i];
@@ -1041,22 +1194,11 @@
             }
         }
 
-        let w = {};
-        for (let i in modules.tt.meta.workflows) {
-            w[modules.tt.meta.workflows[i]] = modules.tt.meta.workflows[i];
-        }
-
-        for (let i in modules.tt.meta.workflowAliases) {
-            if (w[modules.tt.meta.workflowAliases[i].workflow]) {
-                w[modules.tt.meta.workflowAliases[i].workflow] = modules.tt.meta.workflowAliases[i].alias;
-            }
-        }
-
         let workflows = [];
-        for (let i in w) {
+        for (let i in modules.tt.meta.workflows) {
             workflows.push({
                 id: i,
-                text: "<span class='text-monospace'>[" + i + "]</span> " + w[i],
+                text: modules.tt.meta.workflows[i].name?((modules.tt.meta.workflows[i].name.charAt(0) == "#")?modules.tt.meta.workflows[i].name.substring(1):modules.tt.meta.workflows[i].name):i,
             });
         }
 
@@ -1080,6 +1222,205 @@
                 modules.tt.settings.doSetProjectWorkflows(projectId, result.workflows);
             },
         }).show();
+    },
+
+    addProjectFilter: function (projectId, personals) {
+        let p = [
+            {
+                id: "0",
+                text: i18n("tt.commonFilter"),
+                icon: "fas fa-fw fa-globe-americas",
+            }
+        ];
+
+        for (let i in personals) {
+            p.push({
+                id: i,
+                text: personals[i],
+                icon: "fas fa-fw " + ((parseInt(i) > 1000000)?"fa-users":"fa-user"),
+            });
+        }
+
+        let f = [];
+
+        for (let i in modules.tt.meta.filtersExt) {
+            if (i.charAt(0) !== "#" && !modules.tt.meta.filtersExt[i].owner) {
+                f.push({
+                    id: i,
+                    text: modules.tt.meta.filtersExt[i].name?(trimStr(modules.tt.meta.filtersExt[i].name) + " [" + trimStr(i) + "]"):i,
+                });
+            }
+        }
+
+        cardForm({
+            title: i18n("tt.addProjectFilter"),
+            footer: true,
+            borderless: true,
+            topApply: true,
+            singleColumn: true,
+            apply: i18n("add"),
+            fields: [
+                {
+                    id: "filter",
+                    type: "select2",
+                    title: i18n("tt.filter"),
+                    options: f,
+                    validate: v => {
+                        return !!$.trim(v);
+                    },
+                },
+                {
+                    id: "personal",
+                    type: "select2",
+                    title: i18n("tt.personal"),
+                    options: p,
+                },
+            ],
+            callback: result => {
+                modules.tt.settings.doAddProjectFilter(projectId, result.filter, result.personal)
+            },
+        }).show();
+    },
+
+    deleteProjectFilter: function (projectFilterId, projectId) {
+        mConfirm(i18n("tt.confirmFilterDelete", projectFilterId), i18n("confirm"), `danger:${i18n("delete")}`, () => {
+            modules.tt.settings.doDeleteProjectFilter(projectId, projectFilterId);
+        });
+    },
+
+    projectFilters: function (projectId) {
+
+        function pFilters(projectId, personals) {
+            GET("accounts", "users").
+            done(response => {
+                let project = false;
+                let filters = {};
+
+                for (let i in modules.tt.meta.projects) {
+                    if (modules.tt.meta.projects[i].projectId == projectId) {
+                        project = modules.tt.meta.projects[i];
+                        break;
+                    }
+                }
+
+                for (let i in response.users) {
+                    if (response.users[i].uid) {
+                        personals[parseInt(response.users[i].uid)] = $.trim((response.users[i].realName?response.users[i].realName:response.users[i].login) + " [" + response.users[i].login + "]");
+                    }
+                }
+
+                for (let i in modules.tt.meta.filtersExt) {
+                    if (!modules.tt.meta.filtersExt[i].owner) {
+                        filters[i] = true;
+                    }
+                }
+
+                cardTable({
+                    target: "#altForm",
+                    title: {
+                        caption: i18n("tt.projectFilters") + " " + i18n("tt.projectId") + projectId,
+                        button: {
+                            caption: i18n("tt.addProjectFilter"),
+                            click: () => {
+                                modules.tt.settings.addProjectFilter(projectId, personals);
+                            },
+                        },
+                        altButton: {
+                            caption: i18n("close"),
+                            click: () => {
+                                $("#altForm").hide();
+                            },
+                        },
+                    },
+                    columns: [
+                        {
+                            title: i18n("tt.projectFilterId"),
+                        },
+                        {
+                            title: i18n("tt.projectFilter"),
+                            nowrap: true,
+                        },
+                        {
+                            title: i18n("tt.projectFilterFile"),
+                            nowrap: true,
+                        },
+                        {
+                            title: i18n("tt.filterPersonal"),
+                            nowrap: true,
+                            fullWidth: true,
+                        },
+                    ],
+                    rows: () => {
+                        let rows = [];
+
+                        for (let i in project.filters) {
+                            if (filters[project.filters[i].filter]) {
+                                rows.push({
+                                    uid: project.filters[i].projectFilterId,
+                                    cols: [
+                                        {
+                                            data: project.filters[i].projectFilterId,
+                                        },
+                                        {
+                                            data: trimStr(project.filters[i].filter?modules.tt.meta.filters[project.filters[i].filter]:project.filters[i].filter, 33, true),
+                                            nowrap: true,
+                                        },
+                                        {
+                                            data: trimStr(project.filters[i].filter, 33, true),
+                                            nowrap: true,
+                                        },
+                                        {
+                                            data: project.filters[i].personal?personals[project.filters[i].personal]:i18n("tt.commonFilter"),
+                                            nowrap: true,
+                                        },
+                                    ],
+                                    dropDown: {
+                                        items: [
+                                            {
+                                                icon: "fas fa-trash-alt",
+                                                title: i18n("tt.deleteFilter"),
+                                                class: "text-danger",
+                                                click: projectFilterId => {
+                                                    modules.tt.settings.deleteProjectFilter(projectFilterId, projectId);
+                                                },
+                                            },
+                                        ],
+                                    },
+                                });
+                            }
+                        }
+
+                        return rows;
+                    },
+                }).show();
+                loadingDone();
+            }).
+            fail(FAIL).
+            fail(loadingDone);
+        }
+
+        loadingStart();
+        GET("tt", "tt", false, true).
+        done(modules.tt.tt).
+        done(() => {
+            if (modules.groups) {
+                modules.groups.loadGroups(() => {
+                    let personals = {};
+    
+                    for (let i in modules.groups.meta) {
+                        if (modules.groups.meta[i].gid) {
+                            personals[1000000 + parseInt(modules.groups.meta[i].gid)] = $.trim(modules.groups.meta[i].name + " [" + modules.groups.meta[i].acronym + "]");
+                        }
+                    }
+
+                    pFilters(projectId, personals);
+                });
+            } else {
+                pFilters(projectId, {});
+            }
+        }).
+        fail(FAIL).
+        fail(loadingDone);
     },
 
     projectResolutions: function (projectId) {
@@ -1138,6 +1479,16 @@
             });
         }
 
+        customFields.sort((a, b) => {
+            if (a.text > b.text) {
+                return 1;
+            }
+            if (a.text < b.text) {
+                return -1;
+            }
+            return 0;
+        });
+
         cardForm({
             title: i18n("tt.projectCustomFields"),
             footer: true,
@@ -1190,7 +1541,7 @@
                 let users = {};
                 for (let i in response.users) {
                     if (response.users[i].uid) {
-                        users[response.users[i].uid] = $.trim(response.users[i].realName + " [" + response.users[i].login + "]");
+                        users[response.users[i].uid] = $.trim((response.users[i].realName?response.users[i].realName:response.users[i].login) + " [" + response.users[i].login + "]");
                     }
                 }
 
@@ -1254,7 +1605,7 @@
                                             {
                                                 icon: "fas fa-trash-alt",
                                                 title: i18n("users.delete"),
-                                                class: "text-warning",
+                                                class: "text-danger",
                                                 click: projectRoleId => {
                                                     modules.tt.settings.projectDeleteUser(projectRoleId, projectId);
                                                 },
@@ -1281,8 +1632,7 @@
         GET("tt", "tt", false, true).
         done(modules.tt.tt).
         done(() => {
-            GET("accounts", "groups").
-            done(response => {
+            modules.groups.loadGroups(() => {
                 let project = false;
                 for (let i in modules.tt.meta.projects) {
                     if (modules.tt.meta.projects[i].projectId == projectId) {
@@ -1292,15 +1642,17 @@
                 }
 
                 let groups = {};
-                for (let i in response.groups) {
-                    if (response.groups[i].gid) {
-                        groups[response.groups[i].gid] = $.trim(response.groups[i].name + " [" + response.groups[i].acronym + "]");
+                for (let i in modules.groups.meta) {
+                    if (modules.groups.meta[i].gid) {
+                        groups[modules.groups.meta[i].gid] = $.trim(modules.groups.meta[i].name + " [" + modules.groups.meta[i].acronym + "]");
                     }
                 }
 
                 let roles = {};
                 for (let i in modules.tt.meta.roles) {
-                    roles[modules.tt.meta.roles[i].roleId] = $.trim((modules.tt.meta.roles[i].nameDisplay?modules.tt.meta.roles[i].nameDisplay:i18n("tt." + modules.tt.meta.roles[i].name)) + " [" + modules.tt.meta.roles[i].level + "]");
+                    if (modules.tt.meta.roles[i].level > 0) {
+                        roles[modules.tt.meta.roles[i].roleId] = $.trim((modules.tt.meta.roles[i].nameDisplay?modules.tt.meta.roles[i].nameDisplay:i18n("tt." + modules.tt.meta.roles[i].name)) + " [" + modules.tt.meta.roles[i].level + "]");
+                    }
                 }
 
                 cardTable({
@@ -1357,7 +1709,7 @@
                                         {
                                             icon: "fas fa-trash-alt",
                                             title: i18n("groups.delete"),
-                                            class: "text-warning",
+                                            class: "text-danger",
                                             click: projectRoleId => {
                                                 modules.tt.settings.projectDeleteGroup(projectRoleId, projectId);
                                             },
@@ -1370,9 +1722,8 @@
                         return rows;
                     },
                 }).show();
-            }).
-            fail(FAIL).
-            always(loadingDone);
+                loadingDone();
+            });
         }).
         fail(FAIL).
         fail(loadingDone);
@@ -1403,9 +1754,23 @@
                                         title: i18n("tt.tag"),
                                         placeholder: i18n("tt.tag"),
                                     },
+                                    {
+                                        id: "foreground",
+                                        type: "color",
+                                        title: i18n("tt.foreground"),
+                                        placeholder: i18n("tt.foreground"),
+                                        value: "#666666",
+                                    },
+                                    {
+                                        id: "background",
+                                        type: "color",
+                                        title: i18n("tt.background"),
+                                        placeholder: i18n("tt.background"),
+                                        value: "#ffffff",
+                                    },
                                 ],
-                                callback: fields => {
-                                    modules.tt.settings.doAddTag(projectId, fields.tag);
+                                callback: f => {
+                                    modules.tt.settings.doAddTag(projectId, f.tag, f.foreground, f.background);
                                 },
                             });
                         },
@@ -1419,17 +1784,21 @@
                 },
                 edit: tagId => {
                     let tag = "";
+                    let foreground = "#666666";
+                    let background = "#ffffff";
                     for (let i in modules.tt.meta.tags) {
                         if (modules.tt.meta.tags[i].projectId == projectId && modules.tt.meta.tags[i].tagId == tagId) {
                             tag = modules.tt.meta.tags[i].tag;
+                            foreground = modules.tt.meta.tags[i].foreground?modules.tt.meta.tags[i].foreground:foreground;
+                            background = modules.tt.meta.tags[i].background?modules.tt.meta.tags[i].background:background;
                         }
                     }
                     cardForm({
-                        title: i18n("tt.addTag"),
+                        title: i18n("tt.modifyTag"),
                         footer: true,
                         borderless: true,
                         topApply: true,
-                        apply: i18n("add"),
+                        apply: i18n("apply"),
                         delete: i18n("tt.deleteTag"),
                         fields: [
                             {
@@ -1446,14 +1815,28 @@
                                 placeholder: i18n("tt.tag"),
                                 value: tag,
                             },
+                            {
+                                id: "foreground",
+                                type: "color",
+                                title: i18n("tt.foreground"),
+                                placeholder: i18n("tt.foreground"),
+                                value: foreground,
+                            },
+                            {
+                                id: "background",
+                                type: "color",
+                                title: i18n("tt.background"),
+                                placeholder: i18n("tt.background"),
+                                value: background,
+                            },
                         ],
-                        callback: result => {
-                            if (result.delete === "yes") {
+                        callback: f => {
+                            if (f.delete === "yes") {
                                 mConfirm(i18n("tt.confirmDeleteTag", tagId), i18n("confirm"), `danger:${i18n("tt.deleteTag")}`, () => {
                                     modules.tt.settings.doDeleteTag(tagId, projectId);
                                 });
                             } else {
-                                modules.tt.settings.doModifyTag(tagId, fields.tag, projectId);
+                                modules.tt.settings.doModifyTag(tagId, f.tag, f.foreground, f.background, projectId);
                             }
                         },
                     });
@@ -1480,7 +1863,7 @@
                                         data: modules.tt.meta.tags[i].tagId,
                                     },
                                     {
-                                        data: modules.tt.meta.tags[i].tag,
+                                        data: `<span class="mr-1 text-bold" style='border: solid thin #cbccce; padding-left: 7px; padding-right: 7px; padding-top: 2px; padding-bottom: 2px; color: ${modules.tt.meta.tags[i].foreground}; border-radius: 4px; background: ${modules.tt.meta.tags[i].background};'><i class="fas fa-tag mr-2"></i>${modules.tt.meta.tags[i].tag}</span>`,
                                     },
                                 ],
                             });
@@ -1494,6 +1877,86 @@
         }).
         fail(FAIL).
         fail(loadingDone);
+    },
+
+    projectViewers: function (projectId) {
+        let project = false;
+
+        for (let i in modules.tt.meta.projects) {
+            if (modules.tt.meta.projects[i].projectId == projectId) {
+                project = modules.tt.meta.projects[i];
+                break;
+            }
+        }
+
+        let cf = {};
+
+        for (let i in modules.tt.meta.customFields) {
+            cf["_cf_" + modules.tt.meta.customFields[i].field] = modules.tt.meta.customFields[i].fieldDisplay;
+        }
+
+        let vi = {};
+        let va = [];
+
+        let viewers = [];
+        for (let i in modules.tt.meta.viewers) {
+            let key = md5(guid());
+            vi[key] = {
+                field: modules.tt.meta.viewers[i].field,
+                name: modules.tt.meta.viewers[i].name,
+            }
+            if (modules.tt.meta.viewers[i].field.substring(0, 4) == "_cf_") {
+                viewers.push({
+                    id: key,
+                    text: $.trim(cf[modules.tt.meta.viewers[i].field] + " [" + modules.tt.meta.viewers[i].name + "]"),
+                });
+            } else {
+                viewers.push({
+                    id: key,
+                    text: $.trim(i18n("tt." + modules.tt.meta.viewers[i].field) + " [" + modules.tt.meta.viewers[i].name + "]"),
+                });
+            }
+            for (let j in project.viewers) {
+                if (project.viewers[j].field == modules.tt.meta.viewers[i].field && project.viewers[j].name == modules.tt.meta.viewers[i].name) {
+                    va.push(key);
+                }
+            }
+        }
+
+        viewers.sort((a, b) => {
+            if (a.text > b.text) {
+                return 1;
+            }
+            if (a.text < b.text) {
+                return -1;
+            }
+            return 0;
+        });
+
+        cardForm({
+            title: i18n("tt.projectViewers"),
+            footer: true,
+            borderless: true,
+            noHover: true,
+            topApply: true,
+            singleColumn: true,
+            fields: [
+                {
+                    id: "viewers",
+                    type: "multiselect",
+                    title: i18n("tt.projectViewers"),
+                    options: viewers,
+                    value: va,
+                },
+            ],
+            callback: function (result) {
+                let vo = [];
+                for (let i in result.viewers) {
+                     vo.push(vi[result.viewers[i]]);
+                }
+                modules.tt.settings.doSetProjectViewers(projectId, vo);
+            },
+        }).show();
     },
 
     renderProjects: function () {
@@ -1551,6 +2014,11 @@
                                         click: modules.tt.settings.projectWorkflows,
                                     },
                                     {
+                                        icon: "fas fa-filter",
+                                        title: i18n("tt.filters"),
+                                        click: modules.tt.settings.projectFilters,
+                                    },
+                                    {
                                         title: "-",
                                     },
                                     {
@@ -1562,6 +2030,13 @@
                                         icon: "fas fa-edit",
                                         title: i18n("tt.customFields"),
                                         click: modules.tt.settings.projectCustomFields,
+                                        disabled: modules.tt.meta.customFields.length <= 0,
+                                    },
+                                    {
+                                        icon: "fas fa-eye",
+                                        title: i18n("tt.projectViewers"),
+                                        click: modules.tt.settings.projectViewers,
+                                        disabled: modules.tt.meta.viewers.length <= 0,
                                     },
                                     {
                                         icon: "fas fa-tags",
@@ -1580,6 +2055,7 @@
                                         icon: "fas fa-users",
                                         title: i18n("tt.groups"),
                                         click: modules.tt.settings.projectGroups,
+                                        disabled: !AVAIL("accounts", "groups"),
                                     },
                                 ],
                             }
@@ -1596,27 +2072,38 @@
 
     renderWorkflow: function (workflow) {
         loadingStart();
-        GET("tt", "customWorkflow", workflow, true).
+        GET("tt", "workflow", workflow, true).
         done(w => {
-            // TODO f..ck!
-            let top = 75;
-            let height = $(window).height() - top;
+            let height = $(window).height() - mainFormTop;
             let h = '';
             h += `<div id='editorContainer' style='width: 100%; height: ${height}px;'>`;
             h += `<pre class="ace-editor mt-2" id="workflowEditor" style="position: relative; border: 1px solid #ced4da; border-radius: 0.25rem; width: 100%; height: 100%;"></pre>`;
             h += "</div>";
-            h += `<span style='position: absolute; right: 35px; top: 35px;'><span id="workflowSave" class="hoverable"><i class="fas fa-save pr-2"></i>${i18n("tt.worflowSave")}</span></span>`;
+            h += `<span style='position: absolute; right: 35px; top: 35px;'><span id="workflowSave" class="hoverable"><i class="fas fa-save pr-2"></i>${i18n("tt.workflowSave")}</span></span>`;
             $("#mainForm").html(h);
             let editor = ace.edit("workflowEditor");
             editor.setTheme("ace/theme/chrome");
-            editor.session.setMode("ace/mode/php");
+            editor.session.setMode("ace/mode/lua");
             editor.setValue(w.body, -1);
             editor.clearSelection();
             editor.setFontSize(14);
+            editor.commands.addCommand({
+                name: 'save',
+                bindKey: {
+                    win: "Ctrl-S", 
+                    mac: "Cmd-S"
+                },
+                exec: (() => {
+                    $("#workflowSave").click();
+                }),
+            });
             $("#workflowSave").off("click").on("click", () => {
                 loadingStart();
-                PUT("tt", "customWorkflow", workflow, { "body": $.trim(editor.getValue()) }).
+                PUT("tt", "workflow", workflow, { "body": textRTrim($.trim(editor.getValue())) }).
                 fail(FAIL).
+                done(() => {
+                    message(i18n("tt.workflowWasSaved"));
+                }).
                 always(() => {
                     loadingDone();
                 });
@@ -1631,7 +2118,7 @@
     deleteWorkflow: function (workflow) {
         mConfirm(i18n("tt.confirmWorkflowDelete", workflow), i18n("confirm"), i18n("delete"), () => {
             loadingStart();
-            DELETE("tt", "customWorkflow", workflow, false).
+            DELETE("tt", "workflow", workflow, false).
             fail(err => {
                 FAIL(err);
                 loadingDone();
@@ -1660,7 +2147,7 @@
                 },
             ],
             callback: f => {
-                location.href = "#tt.settings&section=workflow&workflow=" + f.file;
+                location.href = "?#tt.settings&section=workflow&workflow=" + encodeURIComponent(f.file);
             },
         }).show();
     },
@@ -1673,7 +2160,7 @@
             cardTable({
                 target: "#mainForm",
                 title: {
-                    caption: i18n("tt.workflows"),
+                    caption: i18n("tt.workflows") + " <a href='?#tt.settings&section=libs' class='ml-3 hoverable pointer'>" + i18n("tt.libs") + "</a>",
                     button: {
                         caption: i18n("tt.addWorkflow"),
                         click: modules.tt.settings.addWorkflow,
@@ -1685,46 +2172,183 @@
                         title: i18n("tt.workflow"),
                     },
                     {
-                        title: i18n("tt.workflowAlias"),
+                        title: i18n("tt.workflowName"),
                         fullWidth: true,
                     },
                 ],
-                edit: modules.tt.settings.setWorkflowAlias,
+                edit: workflow => {
+                    location.href = "?#tt.settings&section=workflow&workflow=" + encodeURIComponent(workflow);
+                },
                 rows: () => {
                     let rows = [];
 
-                    let w = {};
-                    for (let i = 0; i < modules.tt.meta.workflowAliases.length; i++) {
-                        w[modules.tt.meta.workflowAliases[i].workflow] = modules.tt.meta.workflowAliases[i].alias;
-                    }
+                    for (let i in modules.tt.meta.workflows) {
+                        let wn = modules.tt.meta.workflows[i].name?modules.tt.meta.workflows[i].name:i;
 
-                    for (let i = 0; i < modules.tt.meta.workflows.length; i++) {
+                        if (wn.charAt(0) == "#") {
+                            wn = wn.substring(1);
+                        }
                         rows.push({
-                            uid: modules.tt.meta.workflows[i].file,
+                            uid: i,
                             cols: [
                                 {
-                                    data: modules.tt.meta.workflows[i].file,
+                                    data: i,
                                 },
                                 {
-                                    data: w[modules.tt.meta.workflows[i].file]?w[modules.tt.meta.workflows[i].file]:modules.tt.meta.workflows[i].file,
+                                    data: wn,
                                 },
                             ],
                             dropDown: {
                                 items: [
                                     {
-                                        icon: "far fa-file-code",
-                                        title: i18n("tt.editWorkflow"),
-                                        click: workflow => {
-                                            location.href = "#tt.settings&section=workflow&workflow=" + workflow;
-                                        },
-                                    },
-                                    {
                                         icon: "far fa-trash-alt",
                                         title: i18n("tt.deleteWorkflow"),
+                                        class: "text-danger",
                                         click: workflow => {
                                             modules.tt.settings.deleteWorkflow(workflow);
                                         },
-                                        disabled: modules.tt.meta.workflows[i].type === "builtIn",
+                                    },
+                                ],
+                            },
+                        });
+                    }
+
+                    return rows;
+                },
+            });
+        }).
+        fail(FAIL).
+        always(loadingDone);
+    },
+
+    renderWorkflowLib: function (lib) {
+        loadingStart();
+        GET("tt", "lib", lib, true).
+        done(l => {
+            let height = $(window).height() - mainFormTop;
+            let h = '';
+            h += `<div id='editorContainer' style='width: 100%; height: ${height}px;'>`;
+            h += `<pre class="ace-editor mt-2" id="libEditor" style="position: relative; border: 1px solid #ced4da; border-radius: 0.25rem; width: 100%; height: 100%;"></pre>`;
+            h += "</div>";
+            h += `<span style='position: absolute; right: 35px; top: 35px;'><span id="libSave" class="hoverable"><i class="fas fa-save pr-2"></i>${i18n("tt.workflowLibSave")}</span></span>`;
+            $("#mainForm").html(h);
+            let editor = ace.edit("libEditor");
+            editor.setTheme("ace/theme/chrome");
+            editor.session.setMode("ace/mode/lua");
+            editor.setValue(l.body, -1);
+            editor.clearSelection();
+            editor.setFontSize(14);
+            editor.commands.addCommand({
+                name: 'save',
+                bindKey: {
+                    win: "Ctrl-S", 
+                    mac: "Cmd-S"
+                },
+                exec: (() => {
+                    $("#libSave").click();
+                }),
+            });
+            $("#libSave").off("click").on("click", () => {
+                loadingStart();
+                PUT("tt", "lib", lib, { "body": textRTrim($.trim(editor.getValue())) }).
+                fail(FAIL).
+                done(() => {
+                    message(i18n("tt.workflowLibWasSaved"));
+                }).
+                always(() => {
+                    loadingDone();
+                });
+            });
+        }).
+        fail(FAIL).
+        always(() => {
+            loadingDone();
+        });
+    },
+
+    deleteWorkflowLib: function (lib) {
+        mConfirm(i18n("tt.confirmWorkflowLibDelete", lib), i18n("confirm"), i18n("delete"), () => {
+            loadingStart();
+            DELETE("tt", "lib", lib, false).
+            fail(err => {
+                FAIL(err);
+                loadingDone();
+            }).
+            done(() => {
+                modules.tt.settings.renderWorkflowLibs();
+            });
+        });
+    },
+
+    addWorkflowLib: function () {
+        cardForm({
+            title: i18n("tt.addWorkflowLib"),
+            footer: true,
+            borderless: true,
+            topApply: true,
+            fields: [
+                {
+                    id: "file",
+                    type: "text",
+                    title: i18n("tt.workflowLib"),
+                    placeholder: i18n("tt.workflowLib"),
+                    validate: (v) => {
+                        return $.trim(v) !== "";
+                    }
+                },
+            ],
+            callback: f => {
+                location.href = "?#tt.settings&section=lib&lib=" + encodeURIComponent(f.file);
+            },
+        }).show();
+    },
+
+    renderWorkflowLibs: function () {
+        loadingStart();
+        GET("tt", "tt", false, true).
+        done(modules.tt.tt).
+        done(() => {
+            cardTable({
+                target: "#mainForm",
+                title: {
+                    caption: i18n("tt.workflowLibs") + " <a href='?#tt.settings&section=workflows' class='ml-3 hoverable pointer'>" + i18n("tt.workflows") + "</a>",
+                    button: {
+                        caption: i18n("tt.addWorkflowLib"),
+                        click: modules.tt.settings.addWorkflowLib,
+                    },
+                    filter: true,
+                },
+                columns: [
+                    {
+                        title: i18n("tt.workflowLib"),
+                        fullWidth: true,
+                    },
+                ],
+                edit: lib => {
+                    location.href = "?#tt.settings&section=lib&lib=" + encodeURIComponent(lib);
+                },
+                rows: () => {
+                    let rows = [];
+
+                    for (let i in modules.tt.meta.workflowLibs) {
+                        let wl = modules.tt.meta.workflowLibs[i];
+
+                        rows.push({
+                            uid: wl,
+                            cols: [
+                                {
+                                    data: wl,
+                                },
+                            ],
+                            dropDown: {
+                                items: [
+                                    {
+                                        icon: "far fa-trash-alt",
+                                        title: i18n("tt.deleteWorkflowLib"),
+                                        class: "text-danger",
+                                        click: lib => {
+                                            modules.tt.settings.deleteWorkflowLib(lib);
+                                        },
                                     },
                                 ],
                             },
@@ -1747,6 +2371,10 @@
             cardTable({
                 target: "#mainForm",
                 title: {
+                    button: {
+                        caption: i18n("tt.addStatus"),
+                        click: modules.tt.settings.addStatus,
+                    },
                     caption: i18n("tt.statuses"),
                     filter: true,
                 },
@@ -1757,9 +2385,6 @@
                     {
                         title: i18n("tt.status"),
                         nowrap: true,
-                    },
-                    {
-                        title: i18n("tt.statusDisplay"),
                         fullWidth: true,
                     },
                 ],
@@ -1776,9 +2401,6 @@
                                 },
                                 {
                                     data: modules.tt.meta.statuses[i].status,
-                                },
-                                {
-                                    data: modules.tt.meta.statuses[i].statusDisplay,
                                 },
                             ],
                         });
@@ -1922,13 +2544,16 @@
                         title: i18n("tt.customFieldId"),
                     },
                     {
+                        title: i18n("tt.customFieldCatalog"),
+                    },
+                    {
                         title: i18n("tt.customFieldField"),
                     },
                     {
                         title: i18n("tt.customFieldType"),
                     },
                     {
-                        title: i18n("tt.customFieldWorflow"),
+                        title: i18n("tt.customFieldEditor"),
                     },
                     {
                         title: i18n("tt.customFieldDisplay"),
@@ -1940,6 +2565,61 @@
                     let rows = [];
 
                     for (let i = 0; i < modules.tt.meta.customFields.length; i++) {
+                        let editor = '';
+
+                        if (modules.tt.meta.customFields[i].type == "text") {
+                            switch (modules.tt.meta.customFields[i].editor) {
+                                case "text":
+                                    editor = i18n("tt.customFieldEditorString");
+                                    break;
+                                case "text-ro":
+                                    editor = i18n("tt.customFieldEditorStringRO");
+                                    break;
+                                case "number":
+                                    editor = i18n("tt.customFieldEditorNumber");
+                                    break;
+                                case "area":
+                                    editor = i18n("tt.customFieldEditorText");
+                                    break;
+                                case "email":
+                                    editor = i18n("tt.customFieldEditorEmail");
+                                    break;
+                                case "tel":
+                                    editor = i18n("tt.customFieldEditorTel");
+                                    break;
+                                case "date":
+                                    editor = i18n("tt.customFieldEditorDate");
+                                    break;
+                                case "time":
+                                    editor = i18n("tt.customFieldEditorTime");
+                                    break;
+                                case "datetime-local":
+                                    editor = i18n("tt.customFieldEditorDateTime");
+                                    break;
+                                case "yesno":
+                                    editor = i18n("tt.customFieldEditorYesNo");
+                                    break;
+                                case "noyes":
+                                    editor = i18n("tt.customFieldEditorNoYes");
+                                    break;
+                                case "json":
+                                    editor = i18n("tt.customFieldEditorJSON");
+                                    break;
+                            }
+                        }
+
+                        try {
+                            if (modules.tt.meta.customFields[i].type == "select" || modules.tt.meta.customFields[i].type == "users") {
+                                editor = (modules.tt.meta.customFields[i].format.indexOf("multiple") >= 0)?i18n("tt.multiple"):i18n("tt.single");
+                            }
+                        } catch (_) {
+                            // do nothing
+                        }
+
+                        if (modules.tt.meta.customFields[i].type == "array") {
+                            editor = i18n("tt.customFieldEditorArray");
+                        }
+
                         rows.push({
                             uid: modules.tt.meta.customFields[i].customFieldId,
                             cols: [
@@ -1947,14 +2627,18 @@
                                     data: modules.tt.meta.customFields[i].customFieldId,
                                 },
                                 {
+                                    data: modules.tt.meta.customFields[i].catalog?modules.tt.meta.customFields[i].catalog:"-",
+                                },
+                                {
                                     data: modules.tt.meta.customFields[i].field,
                                 },
                                 {
-                                    data: i18n("tt.customFieldType" + modules.tt.meta.customFields[i].type),
+                                    data: i18n("tt.customFieldType" + modules.tt.meta.customFields[i].type.charAt(0).toUpperCase() + modules.tt.meta.customFields[i].type.slice(1)),
                                     nowrap: true,
                                 },
                                 {
-                                    data: modules.tt.meta.customFields[i].workflow?i18n("yes"):i18n("no"),
+                                    data: editor,
+                                    nowrap: true,
                                 },
                                 {
                                     data: modules.tt.meta.customFields[i].fieldDisplay,
@@ -1963,6 +2647,22 @@
                         });
                     }
 
+                    rows.sort((a, b) => {
+                        if (a.cols[1].data > b.cols[1].data) {
+                            return 1;
+                        }
+                        if (a.cols[1].data < b.cols[1].data) {
+                            return -1;
+                        }
+                        if (a.cols[5].data > b.cols[5].data) {
+                            return 1;
+                        }
+                        if (a.cols[5].data < b.cols[5].data) {
+                            return -1;
+                        }
+                        return 0;
+                    });
+
                     return rows;
                 },
             });
@@ -1971,70 +2671,727 @@
         always(loadingDone);
     },
 
-    modifyFilter: function (fileName) {
-
-    },
-
-    renderFilters: function () {
+    renderFilter: function (filter) {
         loadingStart();
         GET("tt", "tt", false, true).
         done(modules.tt.tt).
         done(() => {
-            cardTable({
-                target: "#mainForm",
-                title: {
-                    button: {
-                        caption: i18n("tt.addFilter"),
-                        click: modules.tt.settings.addFilter,
-                    },
-                    caption: i18n("tt.filters"),
-                    filter: true,
-                },
-                columns: [
-                    {
-                        title: i18n("tt.filterFileName"),
-                    },
-                    {
-                        title: i18n("tt.filterName"),
-                        fullWidth: true,
-                    },
-                ],
-                edit: modules.tt.settings.modifyFilter,
-                rows: () => {
-                    let rows = [];
+            GET("tt", "filter", filter, true).
+            done(f => {
+                let readOnly = false;
+                try {
+                    readOnly = modules.tt.meta.filtersExt[filter].owner?true:false;
+                } catch (_) {
+                    //
+                }
+                let height = $(window).height() - mainFormTop;
+                let h = '';
+                h += `<div id='editorContainer' style='width: 100%; height: ${height}px;'>`;
+                h += `<pre class="ace-editor mt-2" id="filterEditor" style="position: relative; border: 1px solid #ced4da; border-radius: 0.25rem; width: 100%; height: 100%;"></pre>`;
+                h += "</div>";
+                if (!readOnly) {
+                    h += `<span style='position: absolute; right: 35px; top: 35px;'><span id="filterSave" class="hoverable"><i class="fas fa-save pr-2"></i>${i18n("tt.filterSave")}</span></span>`;
+                }
+                $("#mainForm").html(h);
+                let editor = ace.edit("filterEditor");
+                editor.setTheme("ace/theme/chrome");
+                editor.session.setMode("ace/mode/json");
 
-                    for (let i in modules.tt.meta.filters) {
-                        rows.push({
-                            uid: i,
-                            cols: [
-                                {
-                                    data: i,
-                                },
-                                {
-                                    data: modules.tt.meta.filters[i]?modules.tt.meta.filters[i]:i,
-                                },
-                            ],
-                            dropDown: {
-                                items: [
-                                    {
-                                        icon: "fas fa-trash-alt",
-                                        title: i18n("tt.deleteFilter"),
-                                        class: "text-warning",
-                                        click: filterFileName => {
-                                            //
-                                        },
-                                    },
-                                ],
+                let template = {
+                    "name": "My",
+                    "filter": {
+                        "$or": [
+                            {
+                                "assigned": {
+                                    "$elemMatch": {
+                                        "$in": "%%my"
+                                    }
+                                }
                             },
-                        });
+                            {
+                                "author": "%%me"
+                            }
+                        ]
+                    },
+                    "fields": [
+                        "subject",
+                        "status",
+                        "workflow"
+                    ]
+                };
+                template.name = filter;
+                
+                editor.setValue((trim(f.body) == "{}")?JSON.stringify(template, null, 4):f.body , -1);
+                editor.clearSelection();
+                editor.setFontSize(14);
+                editor.setReadOnly(readOnly);
+                editor.commands.addCommand({
+                    name: 'save',
+                    bindKey: {
+                        win: "Ctrl-S", 
+                        mac: "Cmd-S"
+                    },
+                    exec: (() => {
+                        $("#filterSave").click();
+                    }),
+                });
+                $("#filterSave").off("click").on("click", () => {
+                    let f = false;
+                    try {
+                        f = JSON.parse($.trim(editor.getValue()));
+                    } catch (e) {
+                        f = false;
                     }
-
-                    return rows;
-                },
+                    if (f && $.trim(f.name) && f.fields) {
+                        f.fileName = filter;
+                        loadingStart();
+                        PUT("tt", "filter", filter, { "body": JSON.stringify(f, true, 4) }).
+                        done(() => {
+                            message(i18n("tt.filterWasSaved"));
+                            location.href = '?#tt.settings&section=filter&filter=' + encodeURIComponent(filter) + '&_=' + Math.random();                        
+                        }).
+                        fail(FAIL).
+                        fail(loadingDone);
+                    } else {
+                        error(i18n("errors.invalidFilter"), i18n("error"), 30);
+                    }
+                });
+            }).
+            fail(FAIL).
+            always(() => {
+                loadingDone();
             });
         }).
         fail(FAIL).
+        fail(loadingDone);
+    },
+
+    deleteFilter: function (filter) {
+        mConfirm(i18n("tt.filterDelete", filter), i18n("confirm"), i18n("delete"), () => {
+            loadingStart();
+            DELETE("tt", "filter", filter, false).
+            fail(err => {
+                FAIL(err);
+                loadingDone();
+            }).
+            done(() => {
+                modules.tt.settings.renderFilters();
+            });
+        });
+    },
+
+    addFilter: function () {
+        cardForm({
+            title: i18n("tt.addFilter"),
+            footer: true,
+            borderless: true,
+            topApply: true,
+            fields: [
+                {
+                    id: "file",
+                    type: "text",
+                    title: i18n("tt.filter"),
+                    placeholder: i18n("tt.filter"),
+                    validate: (v) => {
+                        return $.trim(v) !== "";
+                    }
+                },
+            ],
+            callback: f => {
+                location.href = "?#tt.settings&section=filter&filter=" + encodeURIComponent(f.file);
+            },
+        }).show();
+    },
+
+    renderFilters: function () {
+        GET("tt", "tt", false, true).
+        done(modules.tt.tt).
+        done(() => {
+            GET("accounts", "users").
+            done(response => {
+                let users = {};
+
+                for (let i in response.users) {
+                    if (response.users[i].uid) {
+                        users[response.users[i].login] = $.trim((response.users[i].realName?response.users[i].realName:response.users[i].login) + " [" + response.users[i].login + "]");
+                    }
+                }
+
+                cardTable({
+                    target: "#mainForm",
+                    title: {
+                        button: {
+                            caption: i18n("tt.addFilter"),
+                            click: modules.tt.settings.addFilter,
+                        },
+                        caption: i18n("tt.filters"),
+                        filter: true,
+                    },
+                    columns: [
+                        {
+                            title: i18n("tt.filterFileName"),
+                        },
+                        {
+                            title: i18n("tt.filterOwner"),
+                        },
+                        {
+                            title: i18n("tt.filterName"),
+                            fullWidth: true,
+                        },
+                    ],
+                    edit: filter => {
+                        location.href = "?#tt.settings&section=filter&filter=" + encodeURIComponent(filter);
+                    },
+                    rows: () => {
+                        let rows = [];
+
+                        for (let i in modules.tt.meta.filtersExt) {
+                            rows.push({
+                                uid: i,
+                                cols: [
+                                    {
+                                        data: trimStr(i, 33, true),
+                                        nowrap: true,
+                                    },
+                                    {
+                                        data: trimStr(modules.tt.meta.filtersExt[i].owner?(users[modules.tt.meta.filtersExt[i].owner]?users[modules.tt.meta.filtersExt[i].owner]:modules.tt.meta.filtersExt[i].owner):i18n("tt.commonFilter"), 33, true),
+                                        nowrap: true,
+                                    },
+                                    {
+                                        data: trimStr(modules.tt.meta.filtersExt[i].name?modules.tt.meta.filtersExt[i].name:i, 33, true),
+                                        nowrap: true,
+                                    },
+                                ],
+                                dropDown: {
+                                    items: [
+                                        {
+                                            icon: "fas fa-trash-alt",
+                                            title: i18n("tt.deleteFilter"),
+                                            class: "text-danger",
+                                            click: modules.tt.settings.deleteFilter,
+                                        },
+                                    ],
+                                },
+                            });
+                        }
+
+                        return rows;
+                    },
+                }).show();
+                loadingDone();
+            }).
+            fail(FAIL).
+            fail(loadingDone);
+        }).
+        fail(FAIL).
+        fail(loadingDone);
+    },
+
+    addCrontab: function () {
+        loadingStart();
+        GET("tt", "tt", false, true).
+        done(modules.tt.tt).
+        done(() => {
+            GET("accounts", "users").
+            done(response => {
+                let users = response.users;
+
+                let crontabs = [
+                    {
+                        id: "-",
+                        text: "-",
+                    },
+                    {
+                        id: "daily",
+                        text: i18n("tt.crontabDaily"),
+                    },
+                    {
+                        id: "minutely",
+                        text: i18n("tt.crontabMinutely"),
+                    },
+                    {
+                        id: "5min",
+                        text: i18n("tt.crontab5min"),
+                    },
+                    {
+                        id: "hourly",
+                        text: i18n("tt.crontabHourly"),
+                    },
+                    {
+                        id: "monthly",
+                        text: i18n("tt.crontabMonthly"),
+                    },
+                ];
+
+                let projectsOptions = [
+                    {
+                        id: "-",
+                        text: "-",
+                    },
+                ];
+
+                let projects = {};
+                let project = false;
+
+                for (let i in modules.tt.meta.projects) {
+                    projects[modules.tt.meta.projects[i].projectId] = modules.tt.meta.projects[i];
+                    if (!project) {
+                        project = modules.tt.meta.projects[i].projectId;
+                    }
+                    projectsOptions.push({
+                        id: modules.tt.meta.projects[i].projectId,
+                        text: $.trim(modules.tt.meta.projects[i].project + " [" + modules.tt.meta.projects[i].acronym + "]"),
+                    });
+                }
+
+                function filtersByProject(projectId) {
+                    let f = [
+                        {
+                            id: "-",
+                            text: "-",
+                        },
+                    ];
+
+                    for (let k in modules.tt.meta.filters) {
+                        f.push({
+                            id: k,
+                            text: trimStr(modules.tt.meta.filters[k], 33, false),
+                        });
+                    }
+
+                    return f;
+                }
+
+                function uidsByProject(projectId) {
+                    let u = [
+                        {
+                            id: "-",
+                            text: "-",
+                        },
+                    ];
+
+                    for (let k in users) {
+                        u.push({
+                            id: users[k].uid,
+                            text: $.trim((users[k].realName?users[k].realName:users[k].login) + " [" + users[k].login + "]"),
+                        });
+                    }
+
+                    return u;
+                }
+
+                cardForm({
+                    title: i18n("tt.addCrontab"),
+                    footer: true,
+                    borderless: true,
+                    topApply: true,
+                    fields: [
+                        {
+                            id: "crontab",
+                            type: "select2",
+                            title: i18n("tt.crontab"),
+                            placeholder: i18n("tt.crontab"),
+                            options: crontabs,
+                            validate: (v) => {
+                                return $.trim(v) !== "" && $.trim(v) !== "-";
+                            },
+                        },
+                        {
+                            id: "projectId",
+                            type: "select2",
+                            title: i18n("tt.project"),
+                            placeholder: i18n("tt.project"),
+                            options: projectsOptions,
+                            validate: v => {
+                                return parseInt(v) && $.trim(v) !== "-";
+                            },
+                            select: (el, id, prefix) => {
+                                $(`#${prefix}filter`).html("").select2({
+                                    data: filtersByProject(el.val()),
+//                                    minimumResultsForSearch: Infinity,
+                                    language: lang["_code"],
+                                });
+                                $(`#${prefix}uid`).html("").select2({
+                                    data: uidsByProject(el.val()),
+//                                    minimumResultsForSearch: Infinity,
+                                    language: lang["_code"],
+                                });
+                            },
+                        },
+                        {
+                            id: "filter",
+                            type: "select2",
+                            title: i18n("tt.filter"),
+                            placeholder: i18n("tt.filter"),
+                            options: filtersByProject(project),
+                            validate: v => {
+                                return $.trim(v) !== "" && $.trim(v) !== "-";
+                            },
+                        },
+                        {
+                            id: "uid",
+                            type: "select2",
+                            title: i18n("tt.crontabUser"),
+                            placeholder: i18n("tt.crontabUser"),
+                            options: uidsByProject(project),
+                            validate: v => {
+                                return $.trim(v) !== "" && $.trim(v) !== "-";
+                            },
+                        },
+                        {
+                            id: "action",
+                            type: "text",
+                            title: i18n("tt.action"),
+                            placeholder: i18n("tt.action"),
+                            validate: v => {
+                                return $.trim(v) !== "";
+                            },
+                        },
+                    ],
+                    callback: modules.tt.settings.doAddCrontab,
+                }).show();
+            }).
+            fail(FAIL).
+            always(loadingDone);
+        }).
+        fail(FAIL).
+        fail(loadingDone);
+    },
+
+    deleteCrontab: function (crontabId) {
+        mConfirm(i18n("tt.confirmCrontabDelete", crontabId), i18n("confirm"), `warning:${i18n("tt.crontabDelete")}`, () => {
+            modules.tt.settings.doDeleteCrontab(crontabId);
+        });
+    },
+
+    renderCrontabs: function () {
+        loadingStart();
+        GET("tt", "tt", false, true).
+        done(modules.tt.tt).
+        done(() => {
+            GET("accounts", "users").
+            done(response => {
+                let users = {};
+
+                for (let i in response.users) {
+                    users[response.users[i].uid] = $.trim((response.users[i].realName?response.users[i].realName:response.users[i].login) + " [" + response.users[i].login + "]");
+                }
+
+                let projects = {};
+
+                for (let i in modules.tt.meta.projects) {
+                    projects[modules.tt.meta.projects[i].projectId] = modules.tt.meta.projects[i].project + " [" + modules.tt.meta.projects[i].acronym + "]";
+                }
+
+                let filters = {};
+                for (let i in modules.tt.meta.filters) {
+                    filters[i] = modules.tt.meta.filters[i] + " [" + i + "]";
+                }
+
+                cardTable({
+                    target: "#mainForm",
+                    title: {
+                        button: {
+                            caption: i18n("tt.addCrontab"),
+                            click: modules.tt.settings.addCrontab,
+                        },
+                        caption: i18n("tt.crontabs"),
+                        filter: true,
+                    },
+                    columns: [
+                        {
+                            title: i18n("tt.crontabId"),
+                        },
+                        {
+                            title: i18n("tt.crontab"),
+                        },
+                        {
+                            title: i18n("tt.project"),
+                        },
+                        {
+                            title: i18n("tt.filter"),
+                        },
+                        {
+                            title: i18n("tt.crontabUser"),
+                            noWrap: true,
+                        },
+                        {
+                            title: i18n("tt.action"),
+                            fullWidth: true,
+                        },
+                    ],
+                    rows: () => {
+                        let rows = [];
+
+                        for (let i in modules.tt.meta.crontabs) {
+                            rows.push({
+                                uid: modules.tt.meta.crontabs[i].crontabId,
+                                cols: [
+                                    {
+                                        data: modules.tt.meta.crontabs[i].crontabId,
+                                        nowrap: true,
+                                    },
+                                    {
+                                        data: i18n("tt.crontab" + modules.tt.meta.crontabs[i].crontab.charAt(0).toUpperCase() + modules.tt.meta.crontabs[i].crontab.slice(1)),
+                                        nowrap: true,
+                                    },
+                                    {
+                                        data: projects[modules.tt.meta.crontabs[i].projectId],
+                                        nowrap: true,
+                                    },
+                                    {
+                                        data: filters[modules.tt.meta.crontabs[i].filter],
+                                        nowrap: true,
+                                    },
+                                    {
+                                        data: users[modules.tt.meta.crontabs[i].uid],
+                                        nowrap: true,
+                                    },
+                                    {
+                                        data: modules.tt.meta.crontabs[i].action,
+                                        nowrap: true,
+                                        fullWidth: true,
+                                    },
+                                ],
+                                dropDown: {
+                                    items: [
+                                        {
+                                            icon: "fas fa-trash-alt",
+                                            title: i18n("tt.deleteCrontab"),
+                                            class: "text-danger",
+                                            click: modules.tt.settings.deleteCrontab,
+                                        },
+                                    ],
+                                },
+                            });
+                        }
+
+                        return rows;
+                    },
+                });
+            }).
+            fail(FAIL).
+            always(loadingDone);
+        }).
+        fail(FAIL).
+        fail(loadingDone);
+    },
+
+    addViewer: function () {
+        loadingStart();
+        GET("tt", "tt", false, true).
+        done(modules.tt.tt).
+        done(() => {
+            let fields = [
+                {
+                    id: "catalog",
+                    text: i18n("tt.catalog"),
+                },
+                {
+                    id: "subject",
+                    text: i18n("tt.subject"),
+                },
+                {
+                    id: "description",
+                    text: i18n("tt.description"),
+                },
+            ];
+
+            for (let i in modules.tt.meta.customFields) {
+                fields.push({
+                    id: "_cf_" + modules.tt.meta.customFields[i].field,
+                    text: modules.tt.meta.customFields[i].fieldDisplay,
+                });
+            }
+
+            cardForm({
+                title: i18n("tt.addViewer"),
+                footer: true,
+                borderless: true,
+                topApply: true,
+                fields: [
+                    {
+                        id: "field",
+                        type: "select2",
+                        title: i18n("tt.viewerField"),
+                        placeholder: i18n("tt.viewerField"),
+                        options: fields,
+                        validate: (v) => {
+                            return $.trim(v) !== "";
+                        }
+                    },
+                    {
+                        id: "name",
+                        type: "text",
+                        title: i18n("tt.viewerName"),
+                        placeholder: i18n("tt.viewerName"),
+                        validate: (v) => {
+                            return $.trim(v) !== "";
+                        }
+                    },
+                ],
+                callback: r => {
+                    location.href = `?#tt.settings&section=viewer&field=${encodeURIComponent(r.field)}&name=${encodeURIComponent(r.name)}`;
+                },
+            }).show();
+        }).
+        fail(FAIL).
         always(loadingDone);
+    },
+
+    renderViewer: function (field, name) {
+        loadingStart();
+        GET("tt", "viewer", false, true).
+        done(v => {
+            let code = `//function ${name} (value, issue, field, target) {\n\treturn value;\n//}\n`;
+            for (let i in v.viewers) {
+                if (v.viewers[i].field == field && v.viewers[i].name == name) {
+                    code = v.viewers[i].code?v.viewers[i].code:`//function ${name} (value, issue, field, target) {\n\treturn value;\n//}\n`;
+                    break;
+                }
+            }
+            let height = $(window).height() - mainFormTop;
+            let h = '';
+            h += `<div id='editorContainer' style='width: 100%; height: ${height}px;'>`;
+            h += `<pre class="ace-editor mt-2" id="viewerEditor" style="position: relative; border: 1px solid #ced4da; border-radius: 0.25rem; width: 100%; height: 100%;"></pre>`;
+            h += "</div>";
+            h += `<span style='position: absolute; right: 35px; top: 35px;'><span id="viewerSave" class="hoverable"><i class="fas fa-save pr-2"></i>${i18n("tt.viewerSave")}</span></span>`;
+            $("#mainForm").html(h);
+            let editor = ace.edit("viewerEditor");
+            editor.setTheme("ace/theme/chrome");
+            editor.session.setMode("ace/mode/javascript");
+            editor.setValue(code, -1);
+            editor.clearSelection();
+            editor.setFontSize(14);
+            editor.commands.addCommand({
+                name: 'save',
+                bindKey: {
+                    win: "Ctrl-S", 
+                    mac: "Cmd-S"
+                },
+                exec: (() => {
+                    $("#viewerSave").click();
+                }),
+            });
+            $("#viewerSave").off("click").on("click", () => {
+                loadingStart();
+                PUT("tt", "viewer", false, { field: field, name: name, code: textRTrim($.trim(editor.getValue())) }).
+                fail(FAIL).
+                done(() => {
+                    message(i18n("tt.viewerWasSaved"));
+                }).
+                always(() => {
+                    loadingDone();
+                });
+            });
+        }).
+        fail(FAIL).
+        always(() => {
+            loadingDone();
+        });
+    },
+
+    renderViewers: function () {
+        loadingStart();
+        GET("tt", "tt", false, true).
+        done(modules.tt.tt).
+        done(() => {
+            GET("tt", "viewer", false, true).
+            done(r => {
+                let cf = {};
+
+                for (let i in modules.tt.meta.customFields) {
+                    cf["_cf_" + modules.tt.meta.customFields[i].field] = modules.tt.meta.customFields[i].fieldDisplay;
+                }
+
+                let v = {};
+
+                r.viewers.sort((a, b) => {
+                    let f1 = (a.field.substring(0, 4) == "_cf_")?cf[a.field]:i18n("tt." + a.field);
+                    let f2 = (b.field.substring(0, 4) == "_cf_")?cf[b.field]:i18n("tt." + b.field);
+                    if (f1 > f2) {
+                        return 1;
+                    }
+                    if (f1 < f2) {
+                        return -1;
+                    }
+                    return 0;
+                });
+
+                cardTable({
+                    target: "#mainForm",
+                    title: {
+                        button: {
+                            caption: i18n("tt.addViewer"),
+                            click: modules.tt.settings.addViewer,
+                        },
+                        caption: i18n("tt.viewers"),
+                        filter: true,
+                    },
+                    columns: [
+                        {
+                            title: i18n("tt.viewer"),
+                        },
+                        {
+                            title: i18n("tt.viewerField"),
+                        },
+                        {
+                            title: i18n("tt.viewerName"),
+                            fullWidth: true,
+                        },
+                    ],
+                    edit: k => {
+                        location.href = `?#tt.settings&section=viewer&field=${encodeURIComponent(v[k].field)}&name=${encodeURIComponent(v[k].name)}`;
+                    },
+                    rows: () => {
+                        let rows = [];
+
+                        for (let i in r.viewers) {
+                            let key = md5(guid());
+                            v[key] = {
+                                field: r.viewers[i].field,
+                                name: r.viewers[i].name,
+                            }
+                            rows.push({
+                                uid: key,
+                                cols: [
+                                    {
+                                        data: r.viewers[i].filename,
+                                        nowrap: true,
+                                    },
+                                    {
+                                        data: (r.viewers[i].field.substring(0, 4) == "_cf_")?cf[r.viewers[i].field]:i18n("tt." + r.viewers[i].field),
+                                        nowrap: true,
+                                    },
+                                    {
+                                        data: r.viewers[i].name,
+                                        nowrap: true,
+                                    },
+                                ],
+                                dropDown: {
+                                    items: [
+                                        {
+                                            icon: "fas fa-trash-alt",
+                                            title: i18n("tt.deleteFilter"),
+                                            class: "text-danger",
+                                            click: k => {
+                                                modules.tt.settings.deleteViewer(v[k].field, v[k].name);
+                                            },
+                                        },
+                                    ],
+                                },
+                            });
+                        }
+
+                        return rows;
+                    },
+                });
+            }).
+            fail(FAIL).
+            always(loadingDone);
+        }).
+        fail(FAIL).
+        fail(loadingDone);
     },
 
     route: function (params) {
@@ -2047,10 +3404,12 @@
             "projects",
             "workflows",
             "filters",
+            "crontabs",
             "statuses",
             "resolutions",
             "roles",
-            "customFields",
+            "customs",
+            "viewers",
         ];
 
         let section = params["section"]?params["section"]:"projects";
@@ -2060,9 +3419,9 @@
         for (let i in sections) {
             top += `<li class="nav-item d-none d-sm-inline-block">`;
             if (sections[i] === section) {
-                top += `<a href="#tt.settings&section=${sections[i]}" class="nav-link text-primary nav-item-back-selected">${i18n("tt." + sections[i])}</a>`;
+                top += `<a href="?#tt.settings&section=${sections[i]}" class="nav-link text-primary nav-item-back-selected">${i18n("tt." + sections[i])}</a>`;
             } else {
-                top += `<a href="#tt.settings&section=${sections[i]}" class="nav-link text-dark nav-item-back-hover">${i18n("tt." + sections[i])}</a>`;
+                top += `<a href="?#tt.settings&section=${sections[i]}" class="nav-link text-dark nav-item-back-hover">${i18n("tt." + sections[i])}</a>`;
             }
             top += `</li>`;
         }
@@ -2078,8 +3437,24 @@
                 modules.tt.settings.renderWorkflow(params["workflow"]);
                 break;
 
+            case "libs":
+                modules.tt.settings.renderWorkflowLibs();
+                break;
+
+            case "lib":
+                modules.tt.settings.renderWorkflowLib(params["lib"]);
+                break;
+    
             case "filters":
                 modules.tt.settings.renderFilters();
+                break;
+
+            case "filter":
+                modules.tt.settings.renderFilter(params["filter"]);
+                break;
+
+            case "crontabs":
+                modules.tt.settings.renderCrontabs();
                 break;
 
             case "statuses":
@@ -2094,8 +3469,16 @@
                 modules.tt.settings.renderRoles();
                 break;
 
-            case "customFields":
+            case "customs":
                 modules.tt.settings.renderCustomFields();
+                break;
+
+            case "viewer":
+                modules.tt.settings.renderViewer(params["field"], params["name"]);
+                break;
+
+            case "viewers":
+                modules.tt.settings.renderViewers();
                 break;
 
             default:

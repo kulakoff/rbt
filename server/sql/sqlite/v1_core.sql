@@ -1,7 +1,7 @@
 -- vars
 CREATE TABLE core_vars
 (
-    var_id integer not null primary key autoincrement,
+    var_id integer primary key autoincrement,
     var_name text not null,
     var_value text
 );
@@ -12,14 +12,18 @@ INSERT INTO core_vars (var_name, var_value) values ('dbVersion', '0');
 -- users
 CREATE TABLE core_users
 (
-    uid integer not null primary key autoincrement,
+    uid integer primary key autoincrement,
     login text not null,
     password text not null,
     enabled integer,
     real_name text,
     e_mail text,
     phone text,
-    default_route text
+    tg text,
+    default_route text,
+    notification text default 'tgEmail',
+    last_login integer,
+    primary_group integer
 );
 CREATE UNIQUE INDEX core_users_login on core_users(login);
 CREATE INDEX core_users_real_name on core_users(real_name);
@@ -27,15 +31,16 @@ CREATE UNIQUE INDEX core_users_e_mail on core_users(e_mail);
 CREATE INDEX core_users_phone on core_users(phone);
 
 -- admin - admin && user - user
-INSERT INTO core_users (uid, login, password, enabled) values (0, 'admin', '$2y$10$rU6/RIgJi5ojfuvibG5yHO/Gv5WnclTK6Rc8u.b9mdONHkVMnhJpy', 1);
-INSERT INTO core_users (login, password, enabled) values ('user', '$2y$10$hA0uXz.PaoKrycZP4AQwAe4WrW7PeEyXegMftWLAaClbQTDHb.MnC', 1);
+INSERT INTO core_users (uid, login, password, real_name, enabled) values (0, 'admin', '$2y$10$rU6/RIgJi5ojfuvibG5yHO/Gv5WnclTK6Rc8u.b9mdONHkVMnhJpy', 'admin', 1);
+INSERT INTO core_users (login, password, real_name, enabled) values ('user', '$2y$10$hA0uXz.PaoKrycZP4AQwAe4WrW7PeEyXegMftWLAaClbQTDHb.MnC', 'user', 1);
 
 -- groups
 CREATE TABLE core_groups
 (
-    gid integer not null primary key autoincrement,
+    gid integer primary key autoincrement,
     acronym text not null,
-    name text not null
+    name text not null,
+    admin integer
 );
 CREATE UNIQUE INDEX core_groups_acronym on core_groups(acronym);
 CREATE UNIQUE INDEX core_groups_name on core_groups(name);
@@ -102,4 +107,18 @@ CREATE TABLE core_api_methods_by_backend
 (
     aid text not null primary key,
     backend text
+);
+
+-- running processes
+CREATE TABLE core_running_processes
+(
+    running_process_id integer primary key autoincrement,
+    pid integer,
+    ppid integer,
+    start integer,                                                                                                      -- UNIX timestamp
+    process text,
+    params text,
+    done integer,                                                                                                       -- UNIX timestamp
+    result text,
+    expire integer
 );

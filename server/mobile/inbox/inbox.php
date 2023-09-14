@@ -16,22 +16,20 @@
 
     auth();
 
-    // $html = "<html><h1>Hello</h1></html>";
-    // response(200, [ 'basePath' => "https://192.168.13.39/", 'code' => trim($html) ]);
-
     require_once __DIR__ . "/../../lib/parsedown/Parsedown.php";
 
     $parsedown = new Parsedown();
-
-    $msgs = [
-        ['date' => '01-01-2022T10:10:10', 'msg' => 'Добро пожаловать! Это просто тестовое сообщение.']
-    ];
+    $inbox = loadBackend("inbox");
+    $subscriber_id = (int)$subscriber['subscriberId'];
+    $msgs = array_map(function($item) {
+        return ['msgId' => $item['msgId'], 'date' => $item['date'], 'msg' => $item['msg']];
+    }, $inbox->getMessages($subscriber_id, "dates", ["dateFrom" => 946684800, "dateTo" => 2147483646]));
 
     usort($msgs, function ($a, $b) {
-        if (strtotime($a['date']) > strtotime($b['date'])) {
+        if ($a['date'] > $b['date']) {
             return -1;
         } else
-            if (strtotime($a['date']) < strtotime($b['date'])) {
+            if ($a['date'] < $b['date']) {
                 return 1;
             } else {
                 return 0;
@@ -43,8 +41,8 @@
     $formatter = new IntlDateFormatter('ru_RU.UTF-8', IntlDateFormatter::LONG, IntlDateFormatter::NONE);
     $h = '';
     foreach ($msgs as $row) {
-        $dd = strtotime($row['date']);
-        $rd = $formatter->format($dd); 
+        $dd = $row['date'];
+        $rd = $formatter->format($dd);
         if ($nd != $rd) {
             $nd = $rd;
             $h .= "<span class=\"inbox-date\">$rd</span><div class=\"inbox-message-primary\"><i class=\"inbox-message-icon icon-avatar\"></i><div class=\"inbox-message-content\">";
@@ -68,10 +66,9 @@
         $h .= "<span class=\"inbox-message-time\">".date("H:i", $dd)."</span></div></div>";
     //        $h .= "<script type=\"application/javascript\">scrollingElement = (document.scrollingElement || document.body);scrollingElement.scrollTop = scrollingElement.scrollHeight;</script>";
     }
+    $html = str_replace("%c", $h, file_get_contents(__DIR__ . "/../../mobile/templates/inbox.html"));
 
-    $html = str_replace("%c", $h, file_get_contents(__DIR__ . "/../../templates/inbox.html"));
+    // помечаем все сообщения как прочитанные
+    $inbox->markMessageAsReaded($subscriber_id);
 
-    // mysql("update dm.inbox set readed=true, code='app' where id='$id' and code is null");
-    // mysql("update dm.inbox set readed=true where id='$id'");
-
-    response(200, [ 'basePath' => $config['mobile']['webServerBasePath'], 'code' => trim($html) ]);
+    response(200, [ 'basePath' => $config['mobile']['web_server_base_path'], 'code' => trim($html) ]);

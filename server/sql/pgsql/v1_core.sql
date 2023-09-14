@@ -19,7 +19,11 @@ CREATE TABLE core_users
     real_name character varying,
     e_mail character varying,
     phone character varying,
-    default_route character varying
+    tg character varying,
+    notification character varying default 'tgEmail',
+    default_route character varying,
+    last_login integer,
+    primary_group integer
 );
 CREATE UNIQUE INDEX core_users_login on core_users(login);
 CREATE INDEX core_users_real_name on core_users(real_name);
@@ -27,15 +31,16 @@ CREATE UNIQUE INDEX core_users_e_mail on core_users(e_mail);
 CREATE INDEX core_users_phone on core_users(phone);
 
 -- admin - admin && user - user
-INSERT INTO core_users (uid, login, password, enabled) values (0, 'admin', '$2y$10$rU6/RIgJi5ojfuvibG5yHO/Gv5WnclTK6Rc8u.b9mdONHkVMnhJpy', 1);
-INSERT INTO core_users (login, password, enabled) values ('user', '$2y$10$hA0uXz.PaoKrycZP4AQwAe4WrW7PeEyXegMftWLAaClbQTDHb.MnC', 1);
+INSERT INTO core_users (uid, login, password, real_name, enabled) values (0, 'admin', '$2y$10$rU6/RIgJi5ojfuvibG5yHO/Gv5WnclTK6Rc8u.b9mdONHkVMnhJpy', 'admin', 1);
+INSERT INTO core_users (login, password, real_name, enabled) values ('user', '$2y$10$hA0uXz.PaoKrycZP4AQwAe4WrW7PeEyXegMftWLAaClbQTDHb.MnC', 'user', 1);
 
 -- groups
 CREATE TABLE core_groups
 (
     gid serial primary key,
     acronym character varying not null,
-    name character varying not null
+    name character varying not null,
+    admin integer
 );
 CREATE UNIQUE INDEX core_groups_acronym on core_groups(acronym);
 CREATE UNIQUE INDEX core_groups_name on core_groups(name);
@@ -102,4 +107,18 @@ CREATE TABLE core_api_methods_by_backend
 (
     aid character varying not null primary key,
     backend character varying
+);
+
+-- running processes
+CREATE TABLE core_running_processes
+(
+    running_process_id serial primary key,
+    pid integer,
+    ppid integer,
+    start integer,
+    process character varying,
+    params character varying,
+    done integer,
+    result character varying,
+    expire integer
 );

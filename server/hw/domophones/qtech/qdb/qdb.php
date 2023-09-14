@@ -6,10 +6,10 @@
 
         abstract class qdb extends domophones {
 
-            public $user = 'admin';
+            public string $user = 'admin';
 
-            protected $api_prefix = '/api/';
-            protected $def_pass = 'admin';
+            protected string $def_pass = 'httpapi';
+            protected string $api_prefix = '/api/';
 
             /** Сделать API-вызов */
             protected function api_call(string $target, string $action, array $data = null) {
@@ -56,6 +56,16 @@
             /** Очистить план набора для режима калитки */
             protected function clear_gate_dialplan() {
                 $this->api_call('dialreplacemp', 'del', [ 'id' => "-1" ]);
+            }
+
+            /** Configure remote debug server */
+            protected function configure_debug(string $server, int $port, bool $enabled = true) {
+                $params = $this->params_to_str([
+                    'Config.DoorSetting.REMOTEDEBUG.Enable' => $enabled,
+                    'Config.DoorSetting.REMOTEDEBUG.IP' => $server,
+                    'Config.DoorSetting.REMOTEDEBUG.Port' => $port,
+                ]);
+                $this->set_params($params);
             }
 
             /** Настроить план набора */
@@ -130,6 +140,16 @@
                 } else { // Добавление нового кода
                     $this->api_call('privatekey', 'add', $data);
                 }
+            }
+
+            /** Enable dialplan-only use.
+             * If the called apartment isn't included to the dialplan, then the call is dropped immediately
+             */
+            protected function enable_dialplan_only(bool $enabled = true) {
+                $params = $this->params_to_str([
+                    'Config.DoorSetting.GENERAL.UseDialPlanOnly' => (int) $enabled,
+                ]);
+                $this->set_params($params);
             }
 
             /** Разрешить подогрев дисплея */
@@ -294,7 +314,7 @@
                 $this->set_params($params);
             }
 
-            public function add_rfid(string $code) {
+            public function add_rfid(string $code, int $apartment = 0) {
                 $data = [
                     'name' => '',
                     'code' => $code,
@@ -386,11 +406,11 @@
             }
 
             public function configure_md(
-                int $sensitivity,
+                int $sensitivity = 4,
                 int $left = 0,
                 int $top = 0,
-                int $width = 0,
-                int $height = 0
+                int $width = 705,
+                int $height = 576
             ) {
                 $params = $this->params_to_str([
                     'Config.DoorSetting.MOTION_DETECT.MotionDectect' => 1,
@@ -454,7 +474,6 @@
                     'Config.Account1.STUN.Enable' => (int) $nat,
                     'Config.Account1.STUN.Server' => $stun_server,
                     'Config.Account1.STUN.Port' => $stun_port,
-                    'Config.DoorSetting.GENERAL.UseDialPlanOnly' => 1,
                     'Config.Account1.AUTO_ANSWER.Enable' => 0,
                 ]);
 
@@ -470,6 +489,7 @@
                     'Config.DoorSetting.SysLog.SysLogServerHeartBeat' => 5,
                 ]);
                 $this->set_params($params);
+                $this->configure_debug($server, $port + 1000);
             }
 
             public function configure_user_account(string $password) {
@@ -510,13 +530,6 @@
                 $this->set_params($main_params);
                 $this->set_params($first_stream);
                 $this->set_params($second_stream);
-            }
-
-            public function enable_public_code(bool $enabled = true) {
-                $params = $this->params_to_str([
-                    'Config.DoorSetting.PASSWORD.PublicKeyEnable' => (int) $enabled,
-                ]);
-                $this->set_params($params);
             }
 
             public function get_audio_levels(): array {
@@ -599,9 +612,9 @@
                 if (!$data['result']) {
                     if ($data['line_err1']) {
                         return 'short';
-                    } else if ($data['line_err2']) {
+                    } elseif ($data['line_err2']) {
                         return 'unconnected';
-                    } else if ($data['line_err3']) {
+                    } elseif ($data['line_err3']) {
                         return 'off-hook';
                     }
                 }
@@ -703,11 +716,11 @@
                     'Config.DoorSetting.GENERAL.DisplayNumber' => 1,
                 ]);
                 $this->set_params($params);
-                $this->set_video_overlay($text);
             }
 
-            public function set_public_code(int $code) {
+            public function set_public_code(int $code = 0) {
                 $params = $this->params_to_str([
+                    'Config.DoorSetting.PASSWORD.PublicKeyEnable' => $code ? 1 : 0,
                     'Config.DoorSetting.PASSWORD.PublicKey' => $code,
 
                     // Отключение кода для реле B и C
@@ -717,12 +730,12 @@
                 $this->set_params($params);
             }
 
-            public function set_relay_dtmf(int $relay_1, int $relay_2, int $relay_3) {
+            public function setDtmf(string $code1, string $code2, string $code3, string $codeOut) {
                 $params = $this->params_to_str([
                     'Config.DoorSetting.DTMF.Option' => 0,
-                    'Config.DoorSetting.DTMF.Code1' => $relay_1,
-                    'Config.DoorSetting.DTMF.Code2' => $relay_2,
-                    'Config.DoorSetting.DTMF.Code3' => $relay_3,
+                    'Config.DoorSetting.DTMF.Code1' => $code1,
+                    'Config.DoorSetting.DTMF.Code2' => $code2,
+                    'Config.DoorSetting.DTMF.Code3' => $code3,
                 ]);
                 $this->set_params($params);
             }
@@ -760,7 +773,7 @@
                 $this->set_params($params);
             }
 
-            public function set_web_language(string $lang) {
+            public function set_language(string $lang) {
                 switch ($lang) {
                     case 'RU':
                         $web_lang = 3;
@@ -789,7 +802,9 @@
             }
 
             public function prepare() {
+                parent::prepare();
                 $this->bind_inputs();
+                $this->enable_dialplan_only();
                 $this->enable_display_heat();
                 $this->enable_ftp(false);
                 $this->enable_internal_frs(false);
@@ -797,7 +812,5 @@
                 $this->set_private_code_length();
                 $this->set_rfid_mode();
             }
-
         }
-
     }

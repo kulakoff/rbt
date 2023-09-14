@@ -9,7 +9,7 @@
 
     init: function () {
         if (AVAIL("authorization", "rights")) {
-            leftSide("fas fa-fw fa-balance-scale-right", i18n("permissions.permissions"), "#permissions");
+            leftSide("fas fa-fw fa-balance-scale-right", i18n("permissions.permissions"), "?#permissions", "accounts");
         }
         moduleLoaded("permissions", this);
     },
@@ -58,7 +58,7 @@
             for (let i in modules.permissions.groups) {
                 g.push({
                     value: modules.permissions.groups[i].gid,
-                    text: modules.permissions.groups[i].acronym,
+                    text: modules.permissions.groups[i].name ? modules.permissions.groups[i].name : modules.permissions.groups[i].acronym,
                 });
             }
         } else {
@@ -88,11 +88,12 @@
             footer: true,
             borderless: true,
             topApply: true,
+            size: "lg",
             fields: [
                 {
                     id: group?"gid":"uid",
                     type: "select2",
-                    title: group?i18n("groups.acronym"):i18n("users.login"),
+                    title: group?i18n("groups.group"):i18n("users.login"),
                     options: group?g:u,
                 },
                 {
@@ -198,18 +199,19 @@
         }).show();
     },
 
-    editRights: function (group, acronym_login, api_name, method_name, allow, deny, options, guid, api, method) {
+    editRights: function (group, group_login, api_name, method_name, allow, deny, options, guid, api, method) {
         cardForm({
             title: i18n("permissions.edit"),
             footer: true,
             borderless: true,
             topApply: true,
+            size: "lg",
             fields: [
                 {
                     id: group?"gid":"uid",
                     type: "text",
-                    title: group?i18n("groups.acronym"):i18n("users.login"),
-                    value: acronym_login,
+                    title: group?i18n("groups.group"):i18n("users.login"),
+                    value: group_login,
                     readonly: true,
                 },
                 {
@@ -271,7 +273,7 @@
         main form (permissions) render function
      */
 
-    rightsForm: function (group, g, u, m) {
+    rightsForm: function (group, g, u, m, tgt) {
         let x = {};
 
         if (group) {
@@ -280,19 +282,21 @@
                 if (!x[t.gid]) {
                     x[t.gid] = {};
                 }
-                if (!x[t.gid][m[t.aid].api]) {
+                if (m[t.aid] && m[t.aid].api && !x[t.gid][m[t.aid].api]) {
                     x[t.gid][m[t.aid].api] = {
                         _aid: t.aid,
                     };
                 }
-                if (!x[t.gid][m[t.aid].api][m[t.aid].method]) {
+                if (m[t.aid] && m[t.aid].api && !x[t.gid][m[t.aid].api][m[t.aid].method]) {
                     x[t.gid][m[t.aid].api][m[t.aid].method] = {
                         _aid: t.aid,
                     };
                 }
-                x[t.gid][m[t.aid].api][m[t.aid].method][m[t.aid].action] = {
-                    _aid: t.aid,
-                    allow: t.allow,
+                if (m[t.aid] && m[t.aid].api) {
+                    x[t.gid][m[t.aid].api][m[t.aid].method][m[t.aid].action] = {
+                        _aid: t.aid,
+                        allow: t.allow,
+                    }
                 }
             }
         } else {
@@ -319,7 +323,7 @@
         }
 
         return cardTable({
-            target: group?"#mainForm":"#altForm",
+            target: tgt,
             title: {
                 button: {
                     caption: i18n("permissions.addRights"),
@@ -348,7 +352,7 @@
                 }
                 modules.permissions.editRights(
                     group,
-                    group?g[uid[0]].acronym:u[uid[0]].login,
+                    group?(g[uid[0]].name ? g[uid[0]].name : g[uid[0]].acronym):u[uid[0]].login,
                     (lang.methods[uid[1]] && lang.methods[uid[1]]["_title"])?lang.methods[uid[1]]["_title"]:uid[1],
                     (lang.methods[uid[1]] && lang.methods[uid[1]][uid[2]])?lang.methods[uid[1]][uid[2]]["_title"]:uid[2],
                     a,
@@ -369,7 +373,7 @@
             },
             columns: [
                 {
-                    title: group?i18n("groups.acronym"):i18n("users.login"),
+                    title: group?i18n("groups.group"):i18n("users.login"),
                     nowrap: true,
                 },
                 {
@@ -436,16 +440,20 @@
                                 uid: i.toString() + '-' + j + '-' + k,
                                 cols: [
                                     {
-                                        data: group?g[i].acronym:u[i].login,
+                                        data: group?(g[i].name ? g[i].name : g[i].acronym):u[i].login,
+                                        nowrap: true,
                                     },
                                     {
                                         data: m[x[i][j]._aid].api_text,
+                                        nowrap: true,
                                     },
                                     {
                                         data: m[x[i][j][k]._aid].method_text,
+                                        nowrap: true,
                                     },
                                     {
                                         data: "<span class='text-monospace text-bold'>" + d + "</span>",
+                                        nowrap: true,
                                     },
                                 ],
                             });
@@ -461,6 +469,7 @@
 
     render: function () {
         loadingStart();
+
         GET("authorization", "rights", false, true).done(r => {
             modules.permissions.rights = r.rights;
 
@@ -486,15 +495,7 @@
 
                 modules.permissions.methods = _m.methods;
 
-                GET("accounts", "groups").done(_g => {
-                    modules.permissions.groups = _g.groups;
-
-                    let g = {};
-
-                    for (let i in _g.groups) {
-                        g[_g.groups[i].gid] = _g.groups[i];
-                    }
-
+                function accountsUsers(g, m) {
                     GET("accounts", "users").done(_u => {
                         modules.permissions.users = _u.users;
 
@@ -504,16 +505,35 @@
                             u[_u.users[i].uid] = _u.users[i];
                         }
 
-                        modules.permissions.rightsForm(true, g, u, m);
-                        modules.permissions.rightsForm(false, g, u, m).show();
+                        if (AVAIL("accounts", "group", "POST")) {
+                            modules.permissions.rightsForm(true, g, u, m, "#mainForm");
+                            modules.permissions.rightsForm(false, g, u, m, "#altForm").show();
+                        } else {
+                            modules.permissions.rightsForm(false, g, u, m, "#mainForm");
+                        }
 
                         loadingDone();
                     }).
                     fail(FAIL).
                     fail(loadingDone);
-                }).
-                fail(FAIL).
-                fail(loadingDone);
+                }
+
+                if (AVAIL("accounts", "group", "POST")) {
+                    GET("accounts", "groups").done(_g => {
+                        modules.permissions.groups = _g.groups;
+
+                        let g = {};
+
+                        for (let i in _g.groups) {
+                            g[_g.groups[i].gid] = _g.groups[i];
+                        }
+                        accountsUsers(g, m);
+                    }).
+                    fail(FAIL).
+                    fail(loadingDone);
+                } else {
+                    accountsUsers(false, m);
+                }
             }).
             fail(FAIL).
             fail(loadingDone);

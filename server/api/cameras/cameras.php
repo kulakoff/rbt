@@ -16,10 +16,13 @@
 
             public static function GET($params) {
                 $cameras = loadBackend("cameras");
+                $configs = loadBackend("configs");
+                $frs = loadBackend("frs");
 
                 $response = [
                     "cameras" => $cameras->getCameras(),
-                    "models" => $cameras->getModels(),
+                    "models" => $configs->getCamerasModels(),
+                    "frsServers" => $frs?$frs->servers():[],
                 ];
 
                 return api::ANSWER($response, "cameras");
@@ -27,7 +30,7 @@
 
             public static function index() {
                 return [
-                    "GET" => "#common",
+                    "GET" => "#same(addresses,house,GET)",
                 ];
             }
         }

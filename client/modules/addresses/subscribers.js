@@ -5,6 +5,10 @@
     },
 
     doAddSubscriber: function (subscriber) {
+        subscriber.message = {
+            title: i18n("addresses.addFlatTtitle"),
+            msg: i18n("addresses.addFlatMsg"),
+        }
         loadingStart();
         POST("subscribers", "subscriber", false, subscriber).
         fail(FAIL).
@@ -22,6 +26,18 @@
         fail(FAIL).
         done(() => {
             message(i18n("addresses.keyWasAdded"));
+        }).
+        always(() => {
+            modules.addresses.subscribers.route(hashParse()[1]);
+        });
+    },
+
+    doAddCamera: function (camera) {
+        loadingStart();
+        POST("subscribers", "flatCameras", false, camera).
+        fail(FAIL).
+        done(() => {
+            message(i18n("addresses.cameraWasAdded"));
         }).
         always(() => {
             modules.addresses.subscribers.route(hashParse()[1]);
@@ -52,9 +68,21 @@
         });
     },
 
-    doDeleteSubscriber: function (subscriberId) {
+    doDeleteSubscriber: function (flatId, subscriberId) {
         loadingStart();
-        DELETE("subscribers", "subscriber", subscriberId).
+        DELETE("subscribers", "subscriber", flatId, { subscriberId: subscriberId }).
+        fail(FAIL).
+        done(() => {
+            message(i18n("addresses.subscriberWasDeleted"));
+        }).
+        always(() => {
+            modules.addresses.subscribers.route(hashParse()[1]);
+        });
+    },
+
+    doCompleteDeleteSubscriber: function (subscriberId) {
+        loadingStart();
+        DELETE("subscribers", "subscriber", subscriberId, { complete: true }).
         fail(FAIL).
         done(() => {
             message(i18n("addresses.subscriberWasDeleted"));
@@ -76,6 +104,18 @@
         });
     },
 
+    doDeleteCamera: function (cameraId, flatId) {
+        loadingStart();
+        DELETE("subscribers", "flatCameras", false, { from: "flat", cameraId, flatId }).
+        fail(FAIL).
+        done(() => {
+            message(i18n("addresses.cameraWasDeleted"));
+        }).
+        always(() => {
+            modules.addresses.subscribers.route(hashParse()[1]);
+        });
+    },
+
     addSubscriber: function () {
         cardForm({
             title: i18n("addresses.addSubscriber"),
@@ -88,7 +128,7 @@
                     id: "mobile",
                     type: "text",
                     title: i18n("addresses.mobile"),
-                    placeholder: i18n("addresses.mobile"),
+                    placeholder: config.phonePattern?config.phonePattern:i18n("addresses.mobile"),
                     validate: (v) => {
                         return $.trim(v) !== "";
                     }
@@ -155,7 +195,7 @@
         }).show();
     },
 
-    modifySubscriber: function (subscriberId, list) {
+    modifySubscriber: function (subscriberId, list, flatId) {
         let subscriber = false;
 
         for (let i in list) {
@@ -199,7 +239,6 @@
                 borderless: true,
                 topApply: true,
                 apply: i18n("edit"),
-                delete: i18n("addresses.deleteSubscriber"),
                 size: "lg",
                 fields: [
                     {
@@ -213,7 +252,7 @@
                         id: "mobile",
                         type: "text",
                         title: i18n("addresses.mobile"),
-                        placeholder: i18n("addresses.mobile"),
+                        placeholder: config.phonePattern?config.phonePattern:i18n("addresses.mobile"),
                         validate: (v) => {
                             return $.trim(v) !== "";
                         },
@@ -270,10 +309,32 @@
                             },
                         ],
                     },
+                    {
+                        id: "delete",
+                        type: "select",
+                        title: i18n("addresses.deleteSubscriber"),
+                        options: [
+                            {
+                                id: "0",
+                                text: "&nbsp;",
+                            },
+                            {
+                                id: "1",
+                                text: i18n("addresses.deleteSubscriberFromFlat"),
+                            },
+                            {
+                                id: "2",
+                                text: i18n("addresses.completeDeleteSubscriber"),
+                            }
+                        ]
+                    }
                 ],
                 callback: function (result) {
-                    if (result.delete === "yes") {
-                        modules.addresses.subscribers.deleteSubscriber(subscriberId);
+                    if (parseInt(result.delete) == 2) {
+                        modules.addresses.subscribers.completeDeleteSubscriber(subscriberId);
+                    } else
+                    if (parseInt(result.delete) == 1) {
+                        modules.addresses.subscribers.deleteSubscriber(flatId, subscriberId);
                     } else {
                         let params = hashParse()[1];
 
@@ -347,9 +408,15 @@
         }
     },
 
-    deleteSubscriber: function (subscriberId) {
-        mConfirm(i18n("addresses.confirmDeleteSubscriber", subscriberId.toString()), i18n("confirm"), `danger:${i18n("addresses.deleteSubscriber")}`, () => {
-            modules.addresses.subscribers.doDeleteSubscriber(subscriberId);
+    deleteSubscriber: function (flatId, subscriberId) {
+        mConfirm(i18n("addresses.confirmDeleteSubscriber", subscriberId.toString(), flatId.toString()), i18n("confirm"), `danger:${i18n("addresses.deleteSubscriber")}`, () => {
+            modules.addresses.subscribers.doDeleteSubscriber(flatId, subscriberId);
+        });
+    },
+
+    completeDeleteSubscriber: function (subscriberId) {
+        mConfirm(i18n("addresses.confirmCompleteDeleteSubscriber", subscriberId.toString()), i18n("confirm"), `danger:${i18n("addresses.deleteSubscriber")}`, () => {
+            modules.addresses.subscribers.doCompleteDeleteSubscriber(subscriberId);
         });
     },
 
@@ -359,13 +426,13 @@
         });
     },
 
-    renderSubscribers: function (list, formTarget) {
+    renderSubscribers: function (list, flatId) {
         loadingStart();
 
         let params = hashParse()[1];
 
         cardTable({
-            target: formTarget,
+            target: "#mainForm",
             title: {
                 caption: i18n("addresses.subscribers"),
                 button: {
@@ -374,7 +441,7 @@
                 },
             },
             edit: subscriberId => {
-                modules.addresses.subscribers.modifySubscriber(subscriberId, list);
+                modules.addresses.subscribers.modifySubscriber(subscriberId, list, flatId);
             },
             columns: [
                 {
@@ -418,23 +485,30 @@
                                 data: owner?i18n("yes"):i18n("no"),
                             },
                         ],
+                        dropDown: {
+                            items: [
+                                {
+                                    icon: "far fa-envelope",
+                                    title: i18n("addresses.subscriberInbox"),
+                                    click: subscriberId => {
+                                        location.href = "?#addresses.subscriberInbox&subscriberId=" + subscriberId;
+                                    },
+                                },
+                            ]
+                        },
                     });
                 }
 
                 return rows;
             },
         }).show();
-
-        loadingDone();
     },
 
-    renderKeys: function (list, formTarget) {
-        loadingStart();
-
+    renderKeys: function (list) {
         let params = hashParse()[1];
 
         cardTable({
-            target: formTarget,
+            target: "#altForm",
             title: {
                 caption: i18n("addresses.keys"),
                 button: params.flatId?{
@@ -486,34 +560,169 @@
         loadingDone();
     },
 
+    addCamera: function () {
+        GET("cameras", "cameras", false, true).
+        done(response => {
+            modules.addresses.cameras.meta = response.cameras;
+            let cameras = [];
+
+            cameras.push({
+                id: "0",
+                text: i18n("no"),
+            })
+
+            for (let i in response.cameras.cameras) {
+                let url;
+                try {
+                    url = new URL(response.cameras.cameras[i].url);
+                } catch (e) {
+                    url = {
+                        host: response.cameras.cameras[i].url,
+                    }
+                }
+                cameras.push({
+                    id: response.cameras.cameras[i].cameraId,
+                    text:  url.host,
+                })
+            }
+
+            cardForm({
+                title: i18n("addresses.addCamera"),
+                footer: true,
+                borderless: true,
+                topApply: true,
+                apply: i18n("add"),
+                size: "lg",
+                fields: [
+                    {
+                        id: "cameraId",
+                        type: "select2",
+                        title: i18n("addresses.cameraId"),
+                        options: cameras,
+                    },
+                ],
+                callback: result => {
+                    let params = hashParse()[1];
+                    result.flatId = params.flatId;
+                    modules.addresses.subscribers.doAddCamera(result);
+                },
+            });
+        }).
+        fail(FAIL).
+        always(() => {
+            loadingDone();
+        });
+    },
+
+    renderCameras: function (list) {
+        let params = hashParse()[1];
+
+        cardTable({
+            target: "#altForm",
+            mode: "append",
+            title: {
+                caption: i18n("addresses.cameras"),
+                button: {
+                    caption: i18n("addresses.addCamera"),
+                    click: () => {
+                        modules.addresses.subscribers.addCamera(params.flatId);
+                    },
+                },
+            },
+            columns: [
+                {
+                    title: i18n("addresses.cameraIdList"),
+                },
+                {
+                    title: i18n("addresses.url"),
+                },
+                {
+                    title: i18n("addresses.cameraName"),
+                },
+                {
+                    title: i18n("addresses.comments"),
+                    fullWidth: true,
+                },
+            ],
+            rows: () => {
+                let rows = [];
+
+                for (let i in list) {
+                    rows.push({
+                        uid: list[i].cameraId,
+                        cols: [
+                            {
+                                data: list[i].cameraId?list[i].cameraId:i18n("addresses.deleted"),
+                                click: list[i].cameraId?("#addresses.cameras&filter=" + list[i].cameraId):false,
+                            },
+                            {
+                                data: list[i].url?list[i].url:"",
+                            },
+                            {
+                                data: list[i].name?list[i].name:"",
+                                nowrap: true,
+                            },
+                            {
+                                data: list[i].comment?list[i].comment:"",
+                                nowrap: true,
+                            },
+                        ],
+                        dropDown: {
+                            items: [
+                                {
+                                    icon: "fas fa-trash-alt",
+                                    title: i18n("addresses.deleteCamera"),
+                                    class: "text-danger",
+                                    disabled: !list[i].cameraId,
+                                    click: cameraId => {
+                                        mConfirm(i18n("addresses.confirmDeleteCamera", cameraId), i18n("confirm"), `danger:${i18n("addresses.deleteCamera")}`, () => {
+                                            modules.addresses.subscribers.doDeleteCamera(cameraId, params.flatId);
+                                        });
+                                    },
+                                },
+                            ],
+                        },
+                    });
+                }
+
+                return rows;
+            },
+        }).show();
+    },
+
     route: function (params) {
         modules.addresses.topMenu();
 
         if (params.flat) {
-            subTop(params.house + ", " + params.flat);
+            loadingStart();
 
-            QUERY("subscribers", "subscribers", {
-                by: "flat",
-                query: params.flatId,
-            }).done(responseSubscribers => {
-                QUERY("subscribers", "keys", {
-                    by: "flat",
+            QUERY("addresses", "addresses", {
+                houseId: params.houseId,
+            }).
+            done(modules.addresses.addresses).
+            fail(FAIL).
+            done(a => {
+                for (let i in a.addresses.houses) {
+                    if (a.addresses.houses[i].houseId == params.houseId) {
+                        document.title = i18n("windowTitle") + " :: " + a.addresses.houses[i].houseFull + ", " + params.flat;
+                        subTop(modules.addresses.path((parseInt(params.settlementId)?"settlement":"street"), parseInt(params.settlementId)?params.settlementId:params.streetId) + "<i class=\"fas fa-xs fa-angle-double-right ml-2 mr-2\"></i>" + `<a href="?#addresses.houses&houseId=${params.houseId}">${a.addresses.houses[i].houseFull}</a>` + ", " + params.flat);
+                    }
+                }
+
+                QUERY("subscribers", "subscribers", {
+                    by: "flatId",
                     query: params.flatId,
-                }).done(responseKeys => {
-                    modules.addresses.subscribers.renderSubscribers(responseSubscribers.subscribers, "#mainForm");
-                    modules.addresses.subscribers.renderKeys(responseKeys.keys, "#altForm");
+                }).done(response => {
+                    modules.addresses.subscribers.renderSubscribers(response.flat.subscribers, params.flatId);
+                    modules.addresses.subscribers.renderKeys(response.flat.keys);
+                    modules.addresses.subscribers.renderCameras(response.flat.cameras);
                 }).
                 fail(FAIL).
                 fail(() => {
                     pageError();
                 }).
-                fail(loadingDone);
-            }).
-            fail(FAIL).
-            fail(() => {
-                pageError();
-            }).
-            fail(loadingDone);
+                always(loadingDone);
+            });
         }
     }
 }).init();

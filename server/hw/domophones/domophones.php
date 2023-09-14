@@ -9,13 +9,14 @@
 
         abstract class domophones extends hw {
 
-            public $user;
-            public $pass;
+            public string $user;
+            public string $pass;
 
-            protected $def_pass;
+            protected string $def_pass;
+            protected string $api_prefix;
 
             /**
-             * @throws Exception если панель недоступна
+             * @throws Exception if panel unavailable
              */
             public function __construct(string $url, string $pass, bool $first_time = false) {
                 parent::__construct($url);
@@ -71,7 +72,7 @@
             }
 
             /** Добавить RFID-ключ */
-            abstract public function add_rfid(string $code);
+            abstract public function add_rfid(string $code, int $apartment = 0);
 
             /** Очистка квартиры */
             abstract public function clear_apartment(int $apartment = -1);
@@ -106,11 +107,11 @@
 
             /** Настроить параметры обнаружения движения */
             abstract public function configure_md(
-                int $sensitivity,
+                int $sensitivity = 4,
                 int $left = 0,
                 int $top = 0,
-                int $width = 0,
-                int $height = 0
+                int $width = 705,
+                int $height = 576
             );
 
             /** Настроить NTP */
@@ -135,9 +136,6 @@
 
             /** Настроить видеопоток(-и) */
             abstract public function configure_video_encoding();
-
-            /** Включить/выключить публичный код доступа */
-            abstract public function enable_public_code(bool $enabled = true);
 
             /** Получить уровни аудио */
             abstract public function get_audio_levels(): array;
@@ -181,14 +179,14 @@
             /** Задать SIP-номер для кнопки вызова консьержа */
             abstract public function set_concierge_number(int $number);
 
-            /** Задать текст панели (дисплей + оверлей) */
+            /** Задать текст на дисплее */
             abstract public function set_display_text(string $text = '');
 
             /** Задать публичный код доступа */
-            abstract public function set_public_code(int $code);
+            abstract public function set_public_code(int $code = 0);
 
-            /** Задать DTMF-коды для открытия дверей */
-            abstract public function set_relay_dtmf(int $relay_1, int $relay_2, int $relay_3);
+            /** Set DTMF codes to open doors */
+            abstract public function setDtmf(string $code1, string $code2, string $code3, string $codeOut);
 
             /** Задать SIP-номер для кнопки SOS */
             abstract public function set_sos_number(int $number);
@@ -203,13 +201,15 @@
             abstract public function set_video_overlay(string $title = '');
 
             /** Задать язык WEB-интерфейса */
-            abstract public function set_web_language(string $lang);
+            abstract public function set_language(string $lang);
 
             /** Принудительно сохранить настройки */
             abstract public function write_config();
 
             /** Подготовить панель */
-            abstract public function prepare();
+            public function prepare() {
+                $this->configure_video_encoding();
+            }
 
             /** Очистить и настроить панель */
             public function clean(
@@ -220,6 +220,7 @@
                 int $sip_port,
                 int $ntp_port,
                 int $syslog_port,
+                string $main_door_dtmf = '1',
                 array $audio_levels = [],
                 array $cms_levels = [],
                 string $cms_model = '',
@@ -228,26 +229,23 @@
                 int $stun_port = 3478
             ) {
                 $this->keep_doors_unlocked();
+                $this->configure_syslog($syslog_server, $syslog_port);
                 $this->set_unlock_time(5);
-                $this->set_concierge_number(9999);
-                $this->set_sos_number(112);
-                $this->enable_public_code(false);
+                $this->set_public_code();
                 $this->set_call_timeout(45);
                 $this->set_talk_timeout(90);
-                $this->set_web_language('RU');
+                $this->set_language('RU');
                 $this->set_audio_levels($audio_levels);
                 $this->set_cms_levels($cms_levels);
                 $this->configure_ntp($ntp_server, $ntp_port, 'GMT+03:00');
                 $this->configure_sip($sip_username, $this->pass, $sip_server, $sip_port, $nat, $stun_server, $stun_port);
-                $this->set_relay_dtmf(1, 2, 3);
-                $this->configure_syslog($syslog_server, $syslog_port);
+                $this->setDtmf($main_door_dtmf, '2', '3', '1');
                 $this->clear_rfid();
                 $this->clear_apartment();
+                $this->set_concierge_number(9999);
+                $this->set_sos_number(112);
                 $this->set_cms_model($cms_model);
                 $this->configure_gate([]);
-                $this->configure_video_encoding();
             }
-
         }
-
     }

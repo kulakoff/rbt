@@ -1,38 +1,53 @@
 {
+    "language": "ru",
+
     "api": {
-        "main":"http://127.0.0.1:8000/server/api.php",
-        "asterisk": "http://127.0.0.1:8000/server/api.php"
+        "frontend": "https://example.com/frontend",
+        "asterisk": "http://127.0.0.1/asterisk",
+        "internal": "http://127.0.0.1/internal",
+        "mobile": "https://example.com/mobile"
     },
 
     "mobile": {
-        "webServerBasePath": "<!-- put base path to your static web-content here --!>",
+        "web_server_base_path": "https://example.com/static/",
         "payments": true,
-        "paymentsUrl": "https://dm.lanta.me/app_static/payments/template.html",
-        "cityCams": false,
-        "supportPhone": "+7(4752)429999",
-        "talkMe_id": "<!-- put your talkMe chat id here --!>",
-        "talkMe_domain": "<!-- put your talkMe chat domain id here --!>",
-        "talkMe_token": "<!-- put your talkMe chat rest Api Token here --!>"
+        "payments_url": "https://example.com/static/payments/template.html",
+        "city_cams": false,
+        "support_phone": "+7(4752)429999",
+        "chat": true,
+        "chat_url": "<!-- your chat url or remove it and use talkMe by default with options below--!>",
+        "talk_me_id": "<!-- put your talkMe chat id here --!>",
+        "talk_me_domain": "<!-- put your talkMe chat domain id here --!>",
+        "talk_me_token": "<!-- put your talkMe chat rest Api Token here --!>",
+        "phonePattern": "7 (###) ###-##-##",
+        "tt_project": "TDM",
+        "tt_workflow": "mobile",
+        "tt_user": "mobile",
+        "time_zone": "Europe/Moscow",
+        "guest_access": "turnOnOnly"
     },
 
     "db": {
-        "dsn": "sqlite:/home/mmikel/projects/rbt/server/db/internal.db"
-    },
-
-    "db (unused) rename to db and delete previous db to use postgres": {
-        "dsn": "pgsql:host=127.0.0.1;port=5432;dbname=rbt",
+        "dsn": "pgsql:host=127.0.0.1;port=5433;dbname=rbt",
         "username": "rbt",
-        "password": "rbt",
-        "options": null
+        "password": "rbt"
     },
 
     "redis": {
         "host": "127.0.0.1",
         "port": 6379,
-        "password": "[optional, can be removed or auth here]",
-        "cache_ttl": 3600,
+        "frontend_cache_ttl": 600,
+        "backends_cache_ttl": 604800,
         "max_allowed_tokens": 15,
         "token_idle_ttl": 3600
+    },
+
+    "clickhouse": {
+        "host": "localhost",
+        "port": "8123",
+        "username": "default",
+        "password": "qqq",
+        "database": "default"
     },
 
     "backends": {
@@ -54,22 +69,11 @@
 
         "geocoder": {
             "backend": "dadata",
-            "token": "<!-- your dadata token here --!>",
-            "location is optional, can limit geocoder, see dadata api": "!!! comment, remove this line !!!",
-            "locations": [
-                {
-                    "fias_id": "a9a71961-9363-44ba-91b5-ddf0463aebc2"
-                }
-            ]
+            "token": "<!-- your dadata token here --!>"
         },
 
-        "tt": {
-            "backend": "internal"
-        },
-
-        "attachments": {
-            "backend": "internal",
-            "path": "<-- path to local storage -->"
+        "files": {
+            "backend": "mongo"
         },
 
         "addresses": {
@@ -80,66 +84,135 @@
             "backend": "internal"
         },
 
-        "subscribers": {
-            "backend": "internal"
-        },
-
-        "keys": {
-            "backend": "internal"
-        },
-
-        "domophones": {
-            "backend": "internal"
-        },
-
         "cameras": {
             "backend": "internal"
         },
 
         "isdn": {
             "backend": "lanta",
-            "secret": "<-- your secret here -->",
-            "_comment": "supported subscriber's phone confirm methods: smsCode, outgoingCall or flashCall",
-            "confirmMethod": "outgoingCall"
+            "common_secret": "<!-- your secret here --!>",
+            "confirm_method": "outgoingCall"
         },
 
-        "providers": {
-            "backend": "lanta",
-            "providers.json": "<!-- path to providers.json -->"
+        "inbox": {
+            "backend": "clickhouse"
+        },
+
+        "plog": {
+            "backend": "clickhouse",
+            "time_shift": "<!-- your time shift in seconds from current time as the end timepoint for processing plog_* tables (hint 60) --!>",
+            "max_call_length": "<!-- your max call length in seconds for backward processing call events (hint 120) --!>",
+            "ttl_temp_record": "<!-- your time to live in seconds for temporary data in plog_* tables (hint 86400 - one day) --!>",
+            "ttl_camshot_days": "<!-- your time to live in days for camshots (hint 180 - approx. half year) --!>",
+            "back_time_shift_video_shot": "<!-- your back time shift in seconds for receiving video shot from media server (hint 3) --!>",
+            "cron_process_events_scheduler": "minutely"
+        },
+
+        "configs": {
+            "backend": "json"
+        },
+
+        "dvr": {
+            "backend": "internal",
+            "servers": [
+                {
+                    "title": "Local server",
+                    "type": "nimble or flussonic or  or trassir",
+                    "url": "https://video.server.hostname:8443",
+                    "token": "<!-- mediaserver security token here (only if you use it) --!>",
+                    "management_ip": "127.0.0.1",
+                    "management_port": "8086",
+                    "management_token": "<!-- management token --!>"
+                }
+            ]
+        },
+
+        "dvr_exports": {
+            "backend": "mongo",
+            "dvr_files_ttl": 259200
+        },
+
+        "sip": {
+            "backend": "internal",
+            "servers": [
+                {
+                    "title": "First server",
+                    "type": "asterisk",
+                    "trunk": "first",
+                    "ip": "<!-- your asterisk server external ip here --!>"
+                }
+            ],
+            "stuns": [
+                "stun:stun.l.google.com:19302"
+            ]
+        },
+
+        "frs": {
+            "backend": "internal",
+            "open_door_timeout": 10,
+            "cron_sync_data_scheduler": "5min",
+            "servers": [
+                {
+                    "title": "First server",
+                    "url": "http://127.0.0.1:9051"
+                }
+            ]
+        },
+
+        "cs": {
+            "backend": "internal"
+        },
+
+        "mqtt": {
+            "backend": "internal",
+            "agent": "http://127.0.0.1:8082/broadcast",
+            "ws": "wss://example.com/mqtt",
+            "mqtt": "mqtt://127.0.0.1:1883",
+            "username": "rbt",
+            "password": "<!-- your mosquitto password here --!>"
         }
     },
-
-    "asterisk_servers": [
-        {
-            "title": "First server",
-            "ip": "127.0.0.1",
-            "sip_tcp_port": 5060,
-            "sip_udp_port": 5060,
-            "ami_port": 5038,
-            "ami_password": "b47c9917fd1eed2b450483282faea0cf",
-            "http_port": 8088,
-            "ari_username": "domophone",
-            "ari_password": "b47c9917fd1eed2b450483282faea0cf",
-            "stun_server": "stun:37.235.209.140:3478",
-            "incoming_title": "Входящий вызов",
-            "call_failed": "Пропущенный вызов"
-        }
-    ],
-
-    "telegram": {
-        "token": "your_bot_token_here"
-    },
-
-    "real_ip_header": [
-        "HTTP_X_FORWARDED_FOR",
-        "REMOTE_ADDR"
-    ],
 
     "email": {
         "server": "127.0.0.1",
         "port": 587,
-        "username": "mmikel@localhost",
-        "password": "qwerty",
+        "username": "<!-- your smtp login here -->",
+        "password": "<!-- your smtp password here -->",
         "from": "RBT"
-    }
+    },
+
+    "telegram": {
+        "bot": "<!-- your telegram bot token here --!>"
+    },
+
+    "syslog_servers": {
+        "beward": [
+            "syslog.udp:127.0.0.1:45450"
+        ],
+        "beward_ds": [
+            "syslog.udp:127.0.0.1:45451"
+        ],
+        "qtech": [
+            "syslog.udp:127.0.0.1:45452"
+        ],
+        "is": [
+            "syslog.udp:127.0.0.1:45453"
+        ],
+        "hikvision": [
+            "syslog.udp:127.0.0.1:45454"
+        ],
+        "akuvox": [
+            "syslog.udp:127.0.0.1:45455"
+        ],
+        "rubetek": [
+            "syslog.udp:127.0.0.1:45456"
+        ],
+        "sputnik": [
+            "https://your-https-server/events/sputnik:45457"
+        ]
+    },
+
+    "ntp_servers": [
+        "ntp:<-- your ntp server ip here -->:123"
+    ]
 }

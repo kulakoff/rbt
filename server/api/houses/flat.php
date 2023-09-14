@@ -20,7 +20,7 @@
             {
                 $households = loadBackend("households");
 
-                $flatId = $households->addFlat($params["houseId"], $params["floor"], $params["flat"], $params["code"], $params["entrances"], $params["apartmentsAndLevels"], $params["manualBlock"], $params["openCode"], $params["autoOpen"], $params["whiteRabbit"], $params["sipEnabled"], $params["sipPassword"]);
+                $flatId = $households->addFlat($params["houseId"], $params["floor"], $params["flat"], $params["code"], $params["entrances"], $params["apartmentsAndLevels"], $params["manualBlock"], $params["adminBlock"], $params["openCode"], $params["plog"], $params["autoOpen"], $params["whiteRabbit"], $params["sipEnabled"], $params["sipPassword"]);
 
                 return api::ANSWER($flatId, ($flatId !== false)?"flatId":"notAcceptable");
             }
@@ -46,9 +46,9 @@
             public static function index()
             {
                 return [
-                    "POST" => "#same(houses,house,PUT)",
-                    "PUT" => "#same(houses,house,PUT)",
-                    "DELETE" => "#same(houses,house,PUT)",
+                    "POST" => "#same(addresses,house,PUT)",
+                    "PUT" => "#same(addresses,house,PUT)",
+                    "DELETE" => "#same(addresses,house,PUT)",
                 ];
             }
         }
